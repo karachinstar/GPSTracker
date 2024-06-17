@@ -18,6 +18,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -54,7 +55,10 @@ class MainActivity : AppCompatActivity() {
     private val mapView: MapView by lazy {
         binding.mapView
     }
-    private lateinit var trackRecorderViewModel: TrackRecorderViewModel
+    private val repository = DataRepository(this)
+    private val viewModelFactory = ViewModelFactory(repository)
+    private val mapViewModel: MapViewModel by viewModels { viewModelFactory }
+    private val trackRecorderViewModel: TrackRecorderViewModel by viewModels { viewModelFactory }
 
 
 
@@ -72,16 +76,8 @@ class MainActivity : AppCompatActivity() {
         if (!folder.exists()) {
             folder.mkdirs()
         }
-        val trackRecorder = TrackRecorder(this) // Создайте экземпляр TrackRecorder здесь
-        val factory = TrackRecorderViewModelFactory(trackRecorder)
-        trackRecorderViewModel = ViewModelProvider(this, factory).get(TrackRecorderViewModel::class.java)
 
-        // Установите режим отображения местоположения на COMPASS
         locationDisplay.autoPanMode = LocationDisplay.AutoPanMode.COMPASS_NAVIGATION
-
-
-        //val kmlRecorder = TrackRecorder(this)
-//        val folder = File(this.getExternalFilesDir(null), "GPSTracker")
         requestPermissions()
         setApiKeyForApp()
         setupMap()
@@ -91,13 +87,20 @@ class MainActivity : AppCompatActivity() {
         locationDisplay.startAsync()
         locationDisplay.addLocationChangedListener { locationChangedEvent ->
             val location = locationChangedEvent.location.position
-            trackRecorderViewModel.writeLocation(location.x, location.y)
+            trackRecorderViewModel.onLocationChanged(location.x, location.y)
         }
 
 
         binding.buttonRecordTrack.setOnClickListener {
-            trackRecorderViewModel.toggleRecording()
+            trackRecorderViewModel.startStopRecording()
         }
+        // Наблюдение за изменениями в слоях
+        mapViewModel.layers.observe(this) { layers ->
+            // Обновление слоев на карте
+            mapView.map.operationalLayers.clear()
+            mapView.map.operationalLayers.addAll(layers)
+        }
+
     }
 
     private fun setupTouchListener() {
@@ -328,7 +331,8 @@ class MainActivity : AppCompatActivity() {
             "tif" -> loadGeoTiff(uri)
             "shp" -> {
                 Log.d("MainActivity", "Loading shapefile from $path")
-                loadShapefile(uri)
+                mapViewModel.loadShapefile(uri)
+
             }
             "kml" -> {
                 loadKMLfile(uri)

@@ -6,27 +6,18 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 
-class TrackRecorderViewModel(private val trackRecorder: TrackRecorder) : ViewModel() {
+class TrackRecorderViewModel(private val repository: DataRepository) : ViewModel() {
+    val isRecording: LiveData<Boolean> = repository.isRecording
 
-    private val _isRecording = MutableLiveData<Boolean>()
-    val isRecording: LiveData<Boolean> get() = _isRecording
-
-    init {
-        _isRecording.value = false
+    fun startStopRecording() {
+        repository.toggleRecording()
     }
 
-    fun toggleRecording() {
-        _isRecording.value = !_isRecording.value!!
-        if (_isRecording.value!!) {
-            trackRecorder.startRecording()
-        } else {
-            trackRecorder.finishRecording()
+    fun onLocationChanged(longitude: Double, latitude: Double) {
+        if (isRecording.value == true) {
+            repository.writeLocation(longitude, latitude)
         }
     }
 
-    fun writeLocation(longitude: Double, latitude: Double) {
-        if (_isRecording.value!!) {
-            trackRecorder.writeLocation(longitude, latitude)
-        }
-    }
+    // Ваши другие методы
 }
