@@ -55,19 +55,21 @@ class MainActivity : AppCompatActivity() {
     private val mapView: MapView by lazy {
         binding.mapView
     }
-    private val repository = DataRepository(this)
-    private val viewModelFactory = ViewModelFactory(repository)
-    private val mapViewModel: MapViewModel by viewModels { viewModelFactory }
-    private val trackRecorderViewModel: TrackRecorderViewModel by viewModels { viewModelFactory }
+    private lateinit var repository: DataRepository
+    private lateinit var viewModelFactory: ViewModelFactory
+    private lateinit var mapViewModel: MapViewModel
+    private lateinit var trackRecorderViewModel: TrackRecorderViewModel
 
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
+        repository = DataRepository(applicationContext)
+        viewModelFactory = ViewModelFactory(repository)
+        mapViewModel = ViewModelProvider(this, viewModelFactory)[MapViewModel::class.java]
+        trackRecorderViewModel = ViewModelProvider(this, viewModelFactory)[TrackRecorderViewModel::class.java]
         setContentView(binding.root)
         val locationDisplay = binding.mapView.locationDisplay
-
         val folder: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")
         } else {
@@ -76,13 +78,10 @@ class MainActivity : AppCompatActivity() {
         if (!folder.exists()) {
             folder.mkdirs()
         }
-
         locationDisplay.autoPanMode = LocationDisplay.AutoPanMode.COMPASS_NAVIGATION
         requestPermissions()
         setApiKeyForApp()
         setupMap()
-        setupFileButton()
-        setupSpinner()
         setupTouchListener()
         locationDisplay.startAsync()
         locationDisplay.addLocationChangedListener { locationChangedEvent ->
@@ -90,15 +89,18 @@ class MainActivity : AppCompatActivity() {
             trackRecorderViewModel.onLocationChanged(location.x, location.y)
         }
 
-
         binding.buttonRecordTrack.setOnClickListener {
             trackRecorderViewModel.startStopRecording()
+        }
+        binding.loadFileButton.setOnClickListener {
+            openFile()
         }
         // Наблюдение за изменениями в слоях
         mapViewModel.layers.observe(this) { layers ->
             // Обновление слоев на карте
             mapView.map.operationalLayers.clear()
-            mapView.map.operationalLayers.addAll(layers)
+            val sortedLayers = repository.sortLayers(layers)
+            mapView.map.operationalLayers.addAll(sortedLayers)
         }
 
     }
@@ -111,7 +113,6 @@ class MainActivity : AppCompatActivity() {
         return object : DefaultMapViewOnTouchListener(this, binding.mapView) {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 val screenPoint = android.graphics.Point(Math.round(e.x), Math.round(e.y))
-
                 // identify on all layers
                 val identifyFuture =
                     binding.mapView.identifyLayersAsync(screenPoint, 12.0, false)
@@ -171,51 +172,6 @@ class MainActivity : AppCompatActivity() {
         val dialog = builder.create()
         dialog.show()
     }
-
-
-    private fun setupFileButton() {
-        binding.loadFileButton.setOnClickListener {
-            openFile()
-        }
-    }
-
-    private fun setupSpinner() {
-        val spinner: Spinner = findViewById(R.id.spinnerLayersList)
-        val layers = binding.mapView.map.operationalLayers
-        val layerNames = layers.map { it.name }.toMutableList()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, layerNames)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinner.adapter = adapter
-
-        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>,
-                view: View,
-                position: Int,
-                id: Long
-            ) {
-                val selectedLayerName = parent.getItemAtPosition(position).toString()
-                val selectedLayer = layers.firstOrNull { it.name == selectedLayerName }
-                if (selectedLayer != null) {
-                    layers.remove(selectedLayer)
-                    layers.add(0, selectedLayer)
-                }
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>) {
-                // Ничего не делать
-            }
-        }
-    }
-
-    private fun updateSpinner() {
-        val layers = binding.mapView.map.operationalLayers
-        val layerNames = layers.map { it.name }.toMutableList()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, layerNames)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerLayersList.adapter = adapter
-    }
-
     private fun requestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
@@ -244,7 +200,6 @@ class MainActivity : AppCompatActivity() {
             )
         }
     }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
@@ -263,7 +218,6 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
                 }
-                return
             }
 
             MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION -> {
@@ -328,163 +282,16 @@ class MainActivity : AppCompatActivity() {
         // Определение формата файла по его расширению
         val format = path?.substringAfterLast(".")
         when (format) {
-            "tif" -> loadGeoTiff(uri)
+            "tif" -> mapViewModel.loadGeoTiff(uri)
             "shp" -> {
-                Log.d("MainActivity", "Loading shapefile from $path")
                 mapViewModel.loadShapefile(uri)
-
             }
             "kml" -> {
-                loadKMLfile(uri)
+                mapViewModel.loadKMLfile(uri)
             }
-
             else -> Toast.makeText(this, "Unsupported file format", Toast.LENGTH_SHORT).show()
         }
     }
-
-
-    private fun loadShapefile(uri: Uri) {
-        val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        val fullPath = "/storage/emulated/0/$path"
-        Log.d("MainActivity", "Full path to shapefile: $fullPath")
-
-        // Ваш код для Android 11 и выше
-        val shapefileFeatureTable = ShapefileFeatureTable(fullPath)
-        shapefileFeatureTable.loadAsync()
-        shapefileFeatureTable.addDoneLoadingListener {
-            if (shapefileFeatureTable.loadStatus == LoadStatus.LOADED) {
-                val featureLayer = FeatureLayer(shapefileFeatureTable)
-                // Проверка типа геометрии слоя
-                when (featureLayer.featureTable.geometryType) {
-                    GeometryType.POINT -> {
-                        // Если это точки, установите красный цвет
-                        val redMarkerSymbol = SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10f)
-                        featureLayer.renderer = SimpleRenderer(redMarkerSymbol)
-                    }
-                    GeometryType.POLYGON -> {
-                        // Если это полигон, установите синий контур без заливки
-                        val blueOutline = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.BLUE, 2f)
-                        val fillSymbol = SimpleFillSymbol(SimpleFillSymbol.Style.NULL, Color.TRANSPARENT, blueOutline)
-                        featureLayer.renderer = SimpleRenderer(fillSymbol)
-                    }
-                    GeometryType.POLYLINE -> {
-                        // Если это линия, установите бледно-голубой цвет
-                        val paleBlueLineSymbol = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.parseColor("#ADD8E6"), 2f)
-                        featureLayer.renderer = SimpleRenderer(paleBlueLineSymbol)
-                    }
-
-                    GeometryType.ENVELOPE -> TODO()
-                    GeometryType.MULTIPOINT -> TODO()
-                    GeometryType.UNKNOWN -> TODO()
-                }
-                layersSortedToMap(featureLayer)
-                updateSpinner()
-            } else {
-                Log.e(
-                    "MainActivity",
-                    "Error loading shapefile: " + shapefileFeatureTable.loadError.message
-                )
-            }
-        }
-    }
-
-
-    private fun loadGeoTiff(uri: Uri) {
-        val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        Toast.makeText(this, "$path", Toast.LENGTH_SHORT).show()
-        val fullPath = "/storage/emulated/0/$path"
-        val raster = Raster(fullPath)
-        val rasterLayer = RasterLayer(raster)
-        layersSortedToMap(rasterLayer)
-        updateSpinner()
-    }
-
-    private fun loadKMLfile(uri: Uri) {
-        val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        Toast.makeText(this, "$path", Toast.LENGTH_SHORT).show()
-        val fullPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            "/storage/emulated/0/Documents/$path"
-        } else {
-            "/storage/emulated/0/$path"
-        }
-        // Создание KmlDataset из Uri
-        val kmlDataset = KmlDataset(fullPath)
-
-        // Создание KmlLayer из KmlDataset
-        val kmlLayer = KmlLayer(kmlDataset)
-
-        // Добавление слоя на карту
-
-        binding.mapView.map.operationalLayers.add(kmlLayer)
-
-        // Обработка ошибок
-        kmlLayer.addDoneLoadingListener {
-            if (kmlLayer.loadStatus == LoadStatus.FAILED_TO_LOAD) {
-                Toast.makeText(this, "Failed to load KML layer", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        // Загрузка слоя
-        kmlLayer.loadAsync()
-        updateSpinner()
-
-
-    }
-
-    private fun layersSortedToMap(layer: Layer){
-        when (layer){
-            is FeatureLayer -> {
-                binding.mapView.map.operationalLayers.add(layer)
-            }
-            is RasterLayer -> {
-                binding.mapView.map.operationalLayers.add(layer)
-            }
-            is KmlLayer -> {
-                binding.mapView.map.operationalLayers.add(layer)
-                layer.addDoneLoadingListener {
-                    if (layer.loadStatus == LoadStatus.FAILED_TO_LOAD) {
-                        Toast.makeText(this, "Failed to load KML layer", Toast.LENGTH_SHORT).show()
-                    }
-                }
-
-                // Загрузка слоя
-                //layer.loadAsync()
-                //updateSpinner()
-            }
-        }
-        //binding.mapView.map.operationalLayers.add(layer)
-        // Сортируем слои в соответствии с критериями сортировки
-        //val sortedLayers = mapView.map.operationalLayers.sortedWith(compareBy({ getLayerType(it) }, { getGeometryType(it) }))
-
-        // Очищаем список слоев
-        //mapView.map.operationalLayers.clear()
-
-        // Добавляем отсортированные слои обратно на карту
-       // mapView.map.operationalLayers.addAll(sortedLayers)
-        updateSpinner()
-    }
-
-//    fun getLayerType(layer: Layer): String {
-//        return when (layer) {
-//            is FeatureLayer -> "3"
-//            is RasterLayer -> "1"
-//            is KmlLayer -> "2"
-//            else -> "unknown"
-//        }
-//    }
-//    fun getGeometryType(layer: Layer): String {
-//        return if (layer is FeatureLayer) {
-//            when (layer.featureTable.geometryType) {
-//                GeometryType.POINT -> "6"
-//                GeometryType.POLYLINE -> "5"
-//                GeometryType.POLYGON -> "4"
-//                else -> "unknown"
-//            }
-//        } else {
-//            "unknown"
-//        }
-//    }
-
 
     override fun onPause() {
         mapView.pause()
@@ -506,11 +313,8 @@ class MainActivity : AppCompatActivity() {
         // set your API key
         // Note: it is not best practice to store API keys in source code. The API key is referenced
         // here for the convenience of this tutorial.
-
         ArcGISRuntimeEnvironment.setApiKey("AAPKd7c72361e3384a66b1faabf8969fd6a4osFGH2DPIkVkzcd0eLJ68WuEV1O6C_LYjRBXs4exL5DjCUXj28G-uj5QDcHo7tKn")
-
     }
-
     companion object {
         private const val MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1
         private const val MY_PERMISSIONS_REQUEST_MANAGE_EXTERNAL_STORAGE = 2

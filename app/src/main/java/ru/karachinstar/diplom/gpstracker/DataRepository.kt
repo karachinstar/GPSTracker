@@ -46,7 +46,11 @@ class DataRepository(private val context: Context) {
     fun loadShapefile(uri: Uri): LiveData<FeatureLayer> {
         val result = MutableLiveData<FeatureLayer>()
         val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        val fullPath = "/storage/emulated/0/$path"
+        val fullPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            "/storage/emulated/0/Documents/$path"
+        } else {
+            "/storage/emulated/0/$path"
+        }
         // Ваш код для Android 11 и выше
         val shapefileFeatureTable = ShapefileFeatureTable(fullPath)
         shapefileFeatureTable.loadAsync()
@@ -76,6 +80,7 @@ class DataRepository(private val context: Context) {
                     GeometryType.MULTIPOINT -> TODO()
                     GeometryType.UNKNOWN -> TODO()
                 }
+                _layers.value = _layers.value?.plus(featureLayer) ?: listOf(featureLayer)
                 result.value = featureLayer
             } else {
                 Log.e(
@@ -91,9 +96,14 @@ class DataRepository(private val context: Context) {
     fun loadGeoTiff(uri: Uri): LiveData<RasterLayer> {
         val result = MutableLiveData<RasterLayer>()
         val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        val fullPath = "/storage/emulated/0/$path"
+        val fullPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            "/storage/emulated/0/Documents/$path"
+        } else {
+            "/storage/emulated/0/$path"
+        }
         val raster = Raster(fullPath)
         val rasterLayer = RasterLayer(raster)
+        _layers.value = _layers.value?.plus(rasterLayer) ?: listOf(rasterLayer)
         result.value = rasterLayer
         return result
     }
@@ -119,6 +129,7 @@ class DataRepository(private val context: Context) {
                 // Здесь вы можете обработать ошибку, возможно, установив значение для другого LiveData объекта,
                 // который будет наблюдать ваша ViewModel или Activity.
             } else {
+                _layers.value = _layers.value?.plus(kmlLayer) ?: listOf(kmlLayer)
                 result.value = kmlLayer
             }
         }
@@ -126,6 +137,32 @@ class DataRepository(private val context: Context) {
         // Загрузка слоя
         kmlLayer.loadAsync()
         return result
+    }
+
+    fun sortLayers(layers: List<Layer>): List<Layer> {
+        return layers.sortedWith(compareBy({ getLayerTypeOrder(it) }, { getGeometryTypeOrder(it) }))
+    }
+
+    private fun getLayerTypeOrder(layer: Layer): Int {
+        return when (layer) {
+            is RasterLayer -> 1
+            is KmlLayer -> 2
+            is FeatureLayer -> 3
+            else -> 4
+        }
+    }
+
+    private fun getGeometryTypeOrder(layer: Layer): Int {
+        return if (layer is FeatureLayer) {
+            when (layer.featureTable.geometryType) {
+                GeometryType.POLYGON -> 1
+                GeometryType.POLYLINE -> 2
+                GeometryType.POINT -> 3
+                else -> 4
+            }
+        } else {
+            0
+        }
     }
 
 
