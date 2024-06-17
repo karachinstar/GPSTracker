@@ -15,52 +15,16 @@ import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-//
-//class TrackRecorder(private val filePath: String) {
-//    private var isRecording = false
-//    private var xmlSerializer: XmlSerializer? = null
-//    private var fileWriter: FileWriter? = null
-//
-//    fun toggleRecording() {
-//        if (isRecording) {
-//            finishRecording()
-//        } else {
-//            startRecording()
-//        }
-//        isRecording = !isRecording
-//    }
 
 class TrackRecorder(private val context: Context) {
-    private var isRecording = false
     private var xmlSerializer: XmlSerializer? = null
     private var outputStream: OutputStream? = null
     private var uri: Uri? = null
 
-    fun toggleRecording() {
-        if (isRecording) {
-            finishRecording()
-        } else {
-            startRecording()
-        }
-        isRecording = !isRecording
-    }
-
     fun startRecording() {
-//        val trackFolder = File(filePath, "Track")
-//        if (!trackFolder.exists()) {
-//            trackFolder.mkdir()
-//        }
-//        val sdf = SimpleDateFormat("dd.MM.yyyy-HH:mm", Locale.getDefault())
-//        val currentDate = sdf.format(Date())
-//        val trackFile = File(trackFolder, "$currentDate Track.kml")
-//        xmlSerializer = Xml.newSerializer()
-//        fileWriter = FileWriter(trackFile)
-//        xmlSerializer?.setOutput(fileWriter)
-
         val sdf = SimpleDateFormat("dd.MM.yyyy-HH_mm_ss", Locale.getDefault())
         val currentDate = sdf.format(Date())
         val fileName = "$currentDate Track.kml"
-
         val resolver = context.contentResolver
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
@@ -122,9 +86,8 @@ class TrackRecorder(private val context: Context) {
     }
 
     fun writeLocation(longitude: Double, latitude: Double) {
-        if (isRecording) {
             xmlSerializer?.text("$longitude,$latitude,0 ")
-        }
+            println("Я записываю $longitude, $latitude")
     }
 
     fun finishRecording() {
@@ -139,9 +102,6 @@ class TrackRecorder(private val context: Context) {
         xmlSerializer?.endTag(null, "Document")
         xmlSerializer?.text("\n")
         xmlSerializer?.endTag(null, "kml")
-//        xmlSerializer?.endDocument()
-//        fileWriter?.close()
-
         xmlSerializer?.endDocument()
         outputStream?.close()
     }
