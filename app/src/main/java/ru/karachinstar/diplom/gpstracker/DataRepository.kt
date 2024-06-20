@@ -3,6 +3,7 @@ package ru.karachinstar.diplom.gpstracker
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Color
+
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -13,12 +14,23 @@ import android.widget.Toast
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.esri.arcgisruntime.data.ShapefileFeatureTable
+import com.esri.arcgisruntime.geometry.AngularUnit
+import com.esri.arcgisruntime.geometry.AngularUnitId
+import com.esri.arcgisruntime.geometry.GeodeticCurveType
+import com.esri.arcgisruntime.geometry.GeometryEngine
 import com.esri.arcgisruntime.geometry.GeometryType
+import com.esri.arcgisruntime.geometry.LinearUnit
+import com.esri.arcgisruntime.geometry.LinearUnitId
+import com.esri.arcgisruntime.geometry.Point
+import com.esri.arcgisruntime.geometry.Polyline
+import com.esri.arcgisruntime.geometry.PolylineBuilder
+import com.esri.arcgisruntime.geometry.SpatialReferences
 import com.esri.arcgisruntime.layers.FeatureLayer
 import com.esri.arcgisruntime.layers.KmlLayer
 import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.layers.RasterLayer
 import com.esri.arcgisruntime.loadable.LoadStatus
+import com.esri.arcgisruntime.mapping.view.Graphic
 import com.esri.arcgisruntime.ogc.kml.KmlDataset
 import com.esri.arcgisruntime.raster.Raster
 import com.esri.arcgisruntime.symbology.SimpleFillSymbol
@@ -42,16 +54,21 @@ class DataRepository(private val context: Context) {
     private val _isRecording = MutableLiveData<Boolean>()
     val isRecording: LiveData<Boolean> get() = _isRecording
 
-    // Метод для загрузки Shapefile
+    private val _distance = MutableLiveData<Double>()
+    val distance: LiveData<Double> get() = _distance
+
+    private val _deviation = MutableLiveData<Double>()
+    val deviation: LiveData<Double> get() = _deviation
+
+    private val _graphic = MutableLiveData<Graphic>()
+    val graphic: LiveData<Graphic> get() = _graphic
+
+    /**
+     * Methods loading file
+     */
     fun loadShapefile(uri: Uri): LiveData<FeatureLayer> {
         val result = MutableLiveData<FeatureLayer>()
-        val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        val fullPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            "/storage/emulated/0/Documents/$path"
-        } else {
-            "/storage/emulated/0/$path"
-        }
-        // Ваш код для Android 11 и выше
+        val fullPath = getFullPath(uri)
         val shapefileFeatureTable = ShapefileFeatureTable(fullPath)
         shapefileFeatureTable.loadAsync()
         shapefileFeatureTable.addDoneLoadingListener {
@@ -61,18 +78,30 @@ class DataRepository(private val context: Context) {
                 when (featureLayer.featureTable.geometryType) {
                     GeometryType.POINT -> {
                         // Если это точки, установите красный цвет
-                        val redMarkerSymbol = SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10f)
+                        val redMarkerSymbol =
+                            SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10f)
                         featureLayer.renderer = SimpleRenderer(redMarkerSymbol)
                     }
+
                     GeometryType.POLYGON -> {
                         // Если это полигон, установите синий контур без заливки
-                        val blueOutline = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.BLUE, 2f)
-                        val fillSymbol = SimpleFillSymbol(SimpleFillSymbol.Style.NULL, Color.TRANSPARENT, blueOutline)
+                        val blueOutline =
+                            SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.BLUE, 2f)
+                        val fillSymbol = SimpleFillSymbol(
+                            SimpleFillSymbol.Style.NULL,
+                            Color.TRANSPARENT,
+                            blueOutline
+                        )
                         featureLayer.renderer = SimpleRenderer(fillSymbol)
                     }
+
                     GeometryType.POLYLINE -> {
                         // Если это линия, установите бледно-голубой цвет
-                        val paleBlueLineSymbol = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.parseColor("#ADD8E6"), 2f)
+                        val paleBlueLineSymbol = SimpleLineSymbol(
+                            SimpleLineSymbol.Style.SOLID,
+                            Color.parseColor("#ADD8E6"),
+                            2f
+                        )
                         featureLayer.renderer = SimpleRenderer(paleBlueLineSymbol)
                     }
 
@@ -92,15 +121,9 @@ class DataRepository(private val context: Context) {
         return result
     }
 
-    // Метод для загрузки GeoTiff
     fun loadGeoTiff(uri: Uri): LiveData<RasterLayer> {
         val result = MutableLiveData<RasterLayer>()
-        val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        val fullPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            "/storage/emulated/0/Documents/$path"
-        } else {
-            "/storage/emulated/0/$path"
-        }
+        val fullPath = getFullPath(uri)
         val raster = Raster(fullPath)
         val rasterLayer = RasterLayer(raster)
         _layers.value = _layers.value?.plus(rasterLayer) ?: listOf(rasterLayer)
@@ -108,15 +131,9 @@ class DataRepository(private val context: Context) {
         return result
     }
 
-    // Метод для загрузки KML
     fun loadKMLfile(uri: Uri): LiveData<KmlLayer> {
         val result = MutableLiveData<KmlLayer>()
-        val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
-        val fullPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            "/storage/emulated/0/Documents/$path"
-        } else {
-            "/storage/emulated/0/$path"
-        }
+        val fullPath = getFullPath(uri)
         // Создание KmlDataset из Uri
         val kmlDataset = KmlDataset(fullPath)
 
@@ -152,6 +169,22 @@ class DataRepository(private val context: Context) {
         }
     }
 
+    fun getFullPath(uri: Uri): String {
+        val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
+        return when {
+            uri.path?.startsWith("/document/primary:") == true -> {
+                "/storage/emulated/0/$path"
+            }
+            uri.path?.startsWith("/document/home:") == true -> {
+                "/storage/emulated/0/Documents/$path"
+            }
+            else -> {
+                // Обработка других случаев
+                path ?: ""
+            }
+        }
+    }
+
     private fun getGeometryTypeOrder(layer: Layer): Int {
         return if (layer is FeatureLayer) {
             when (layer.featureTable.geometryType) {
@@ -184,7 +217,8 @@ class DataRepository(private val context: Context) {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, "application/vnd.google-earth.kml+xml")
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).path
+                val documentsDir =
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).path
                 put(MediaStore.MediaColumns.DATA, "$documentsDir/GPSTracker/Track/$fileName")
             } else {
                 put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/GPSTracker/Track")
@@ -259,5 +293,30 @@ class DataRepository(private val context: Context) {
         xmlSerializer?.endDocument()
         outputStream?.close()
         _isRecording.value = false
+    }
+
+    fun drawLineAndTrackDistance(currentPoint: Point, targetPoint: Point): Graphic {
+        // Отрисовать линию
+        val line = PolylineBuilder(SpatialReferences.getWgs84())
+        val lineSymbol = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.RED, 2f)
+        line.addPoint(currentPoint)
+        line.addPoint(targetPoint)
+        _graphic.value = Graphic(line.toGeometry(), lineSymbol)
+        return Graphic(line.toGeometry(), lineSymbol)
+    }
+
+    fun calculateDistance(currentPoint: Point, targetPoint: Point) {
+        // Рассчитать и отобразить расстояние
+        val distance = GeometryEngine.distanceGeodetic(currentPoint, targetPoint, LinearUnit(
+            LinearUnitId.KILOMETERS), AngularUnit(AngularUnitId.DEGREES), GeodeticCurveType.GEODESIC)
+        _distance.value = distance.getDistance() * 1000
+    }
+
+    fun calculateDeviation(currentPoint: Point, polyline: Polyline) {
+        // Рассчитать и отобразить отклонение
+        val nearestCoordinate = GeometryEngine.nearestCoordinate(polyline, currentPoint)
+        val deviation = GeometryEngine.distanceGeodetic(currentPoint, nearestCoordinate.getCoordinate(),
+            LinearUnit(LinearUnitId.KILOMETERS), AngularUnit(AngularUnitId.DEGREES), GeodeticCurveType.GEODESIC)
+        _deviation.value = (deviation.getDistance() * 1000)
     }
 }

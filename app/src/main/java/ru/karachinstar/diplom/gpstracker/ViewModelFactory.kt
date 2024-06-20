@@ -12,6 +12,9 @@ class ViewModelFactory(private val trackRecorder: DataRepository) : ViewModelPro
         if (modelClass.isAssignableFrom(MapViewModel::class.java)) {
             return MapViewModel(trackRecorder) as T
         }
+        if (modelClass.isAssignableFrom(GeodeticPathViewModel::class.java)) {
+            return GeodeticPathViewModel(trackRecorder) as T
+        }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
