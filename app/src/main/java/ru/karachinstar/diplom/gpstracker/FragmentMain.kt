@@ -57,12 +57,10 @@ class FragmentMain : Fragment() {
         }
     private lateinit var mapView: MapView
     private lateinit var repository: DataRepository
-    private lateinit var locationRepository: LocationRepository
     private lateinit var viewModelFactory: ViewModelFactory
     private lateinit var mapViewModel: MapViewModel
     private lateinit var trackRecorderViewModel: TrackRecorderViewModel
     private lateinit var geodeticPathViewModel: GeodeticPathViewModel
-    private lateinit var locationViewModel: LocationViewModel
     private lateinit var graphicsOverlay: GraphicsOverlay
     private lateinit var app: MyApplication
     private lateinit var locationDisplay: LocationDisplay
@@ -78,7 +76,6 @@ class FragmentMain : Fragment() {
     ): View {
         _binding = MainFragmentBinding.inflate(inflater, container, false)
         mapView = binding.mapView
-        //locationRepository = LocationRepository(mapView)
         return binding.root
     }
 
@@ -422,10 +419,7 @@ class FragmentMain : Fragment() {
     }
 
     private fun setupMap() {
-        //mapView.map = app.map
-        //locationViewModel.start()
         mapView.setViewpoint(mapViewModel.mapCenter)
-
     }
 
 
@@ -433,7 +427,6 @@ class FragmentMain : Fragment() {
         mapViewModel.mapCenter = mapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE)
         mapView.map.operationalLayers.clear()
         graphicsOverlay.graphics.clear()
-        //locationViewModel.stop()
         mapView.pause()
         super.onPause()
     }
@@ -441,12 +434,10 @@ class FragmentMain : Fragment() {
     override fun onResume() {
         super.onResume()
         mapView.resume()
-        //locationViewModel.start()
     }
 
     override fun onDestroy() {
         mapView.dispose()
-        //locationViewModel.stop()
         super.onDestroy()
         _binding = null
     }
