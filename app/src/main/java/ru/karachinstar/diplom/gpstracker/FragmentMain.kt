@@ -64,9 +64,10 @@ class FragmentMain : Fragment() {
     private lateinit var graphicsOverlay: GraphicsOverlay
     private lateinit var app: MyApplication
     private lateinit var locationDisplay: LocationDisplay
-    private var selectedFeature: Feature? = null
-    private var targetPoint: Point? = null
-    private var polyline: Polyline? = null
+//    private var geodeticPathData: GeodeticPathData? = null
+//    private var selectedFeature: Feature? = null
+//    private var targetPoint: Point? = null
+//    private var polyline: Polyline? = null
 
 
     override fun onCreateView(
@@ -83,6 +84,7 @@ class FragmentMain : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         requestPermissions()
         setApiKeyForApp()
+        //geodeticPathData = GeodeticPathData()
         app = requireActivity().application as MyApplication
         mapView.map = app.map
         repository = DataRepository(requireContext())
@@ -93,7 +95,6 @@ class FragmentMain : Fragment() {
             ViewModelProvider(this, viewModelFactory)[TrackRecorderViewModel::class.java]
         geodeticPathViewModel =
             ViewModelProvider(this, viewModelFactory)[GeodeticPathViewModel::class.java]
-//        locationViewModel = ViewModelProvider(this, viewModelFactory)[LocationViewModel::class.java]
         graphicsOverlay = GraphicsOverlay()
         binding.mapView.graphicsOverlays.add(graphicsOverlay)
         val folder: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -121,8 +122,9 @@ class FragmentMain : Fragment() {
             binding.distanceTextView.text = "Расстояние:\n $formattedDistance m"
             if (distance <= 1) {
                 graphicsOverlay.graphics.clear()
-                selectedFeature = null
-                targetPoint = null
+                geodeticPathViewModel.selectedFeature = null
+                geodeticPathViewModel.targetPoint = null
+                geodeticPathViewModel.polyline = null
                 graphicsOverlay.graphics.clear()
                 binding.distanceTextView.setBackgroundColor(Color.TRANSPARENT)
                 binding.distanceTextView.text = ""
@@ -158,9 +160,9 @@ class FragmentMain : Fragment() {
             // Now use wgs84Point for your calculations:
             trackRecorderViewModel.onLocationChanged(wgs84Point.x, wgs84Point.y)
 
-            if (selectedFeature != null && targetPoint != null) {
-                geodeticPathViewModel.calculateDistance(wgs84Point, targetPoint!!)
-                geodeticPathViewModel.calculateDeviation(wgs84Point, polyline!!)
+            if (geodeticPathViewModel.selectedFeature != null && geodeticPathViewModel.targetPoint != null) {
+                geodeticPathViewModel.calculateDistance(wgs84Point, geodeticPathViewModel.targetPoint!!)
+                geodeticPathViewModel.calculateDeviation(wgs84Point, geodeticPathViewModel.polyline!!)
             }
         }
 
@@ -232,9 +234,10 @@ class FragmentMain : Fragment() {
 
         builder.setNegativeButton("Show Distance") { dialog, _ ->
             graphicsOverlay.graphics.clear()
-            selectedFeature = identifiedFeature
+            geodeticPathViewModel.selectedFeature = identifiedFeature
             drawLineAndTrackDistance(identifiedFeature, screenPoint)
             dialog.dismiss()
+            println("${geodeticPathViewModel.selectedFeature}")
         }
 
         val dialog = builder.create()
@@ -261,28 +264,28 @@ class FragmentMain : Fragment() {
             val geometry = identifiedFeature.geometry
             //var targetPoint: Point? = null
             if (geometry is Point) {
-                targetPoint = geometry
+                geodeticPathViewModel.targetPoint = geometry
             } else if (geometry is Polygon) {
                 // Найти ближайшую вершину
                 val result = GeometryEngine.nearestVertex(geometry, wgs84Point)
-                targetPoint = result.coordinate
+                geodeticPathViewModel.targetPoint = result.coordinate
             }
 
-            if (targetPoint != null) {
+            if (geodeticPathViewModel.targetPoint != null) {
                 // Отрисовать линию
                 val graphic =
-                    geodeticPathViewModel.drawLineAndTrackDistance(currentPoint, targetPoint!!)
+                    geodeticPathViewModel.drawLineAndTrackDistance(currentPoint, geodeticPathViewModel.targetPoint!!)
                 graphicsOverlay.graphics.add(graphic)
 
                 // Рассчитать и отобразить расстояние
-                geodeticPathViewModel.calculateDistance(currentPoint, targetPoint!!)
+                geodeticPathViewModel.calculateDistance(currentPoint, geodeticPathViewModel.targetPoint!!)
 
                 // Рассчитать и отобразить отклонение
                 if (graphicsOverlay.graphics.isNotEmpty()) {
                     val line = graphicsOverlay.graphics[0]
-                    polyline = line.geometry as? Polyline
-                    if (polyline != null) {
-                        geodeticPathViewModel.calculateDeviation(currentPoint, polyline!!)
+                    geodeticPathViewModel.polyline = line.geometry as? Polyline
+                    if (geodeticPathViewModel.polyline != null) {
+                        geodeticPathViewModel.calculateDeviation(currentPoint, geodeticPathViewModel.polyline!!)
                     }
                 }
             }
