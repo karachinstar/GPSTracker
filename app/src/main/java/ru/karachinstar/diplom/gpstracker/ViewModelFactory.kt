@@ -18,6 +18,9 @@ class ViewModelFactory(private val application: MyApplication) : ViewModelProvid
         if (modelClass.isAssignableFrom(PermissionsViewModel::class.java)) {
             return PermissionsViewModel() as T
         }
+        if (modelClass.isAssignableFrom(FragmentMainViewModel::class.java)) {
+            return FragmentMainViewModel() as T
+        }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

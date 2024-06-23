@@ -1,13 +1,13 @@
 package ru.karachinstar.diplom.gpstracker
 
-import android.Manifest
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
-import android.content.pm.PackageManager
+
 import android.graphics.Color
 import android.net.Uri
-import android.os.Build
+
 import android.os.Bundle
 import android.os.Environment
 import android.os.Parcelable
@@ -57,6 +57,7 @@ class FragmentMain : Fragment() {
             return _binding!!
         }
     private lateinit var mapView: MapView
+    private lateinit var viewModel: FragmentMainViewModel
     private lateinit var repository: DataRepository
     private lateinit var viewModelFactory: ViewModelFactory
     private lateinit var mapViewModel: MapViewModel
@@ -65,8 +66,31 @@ class FragmentMain : Fragment() {
     private lateinit var graphicsOverlay: GraphicsOverlay
     private lateinit var app: MyApplication
     private lateinit var locationDisplay: LocationDisplay
+    private val TAG = "FragmentMain"
+    private val locationChangedListener = LocationDisplay.LocationChangedListener { locationChangedEvent ->
+        val location = locationChangedEvent.location.position
+        val wgs84Point = GeometryEngine.project(location, SpatialReferences.getWgs84()) as Point
+        Log.d("LocationRepository", "Fragment - Location updated: $wgs84Point")
 
+        // Now use wgs84Point for your calculations:
+        trackRecorderViewModel.onLocationChanged(wgs84Point.x, wgs84Point.y)
 
+        if (geodeticPathViewModel.selectedFeature != null && geodeticPathViewModel.targetPoint != null) {
+            geodeticPathViewModel.calculateDistance(
+                wgs84Point,
+                geodeticPathViewModel.targetPoint!!
+            )
+            geodeticPathViewModel.calculateDeviation(
+                wgs84Point,
+                geodeticPathViewModel.polyline!!
+            )
+        }
+    }
+
+    override fun onCreate(savedInstanceState:Bundle?) {
+        super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate called")
+    }
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -74,18 +98,20 @@ class FragmentMain : Fragment() {
     ): View {
         setApiKeyForApp()
         _binding = MainFragmentBinding.inflate(inflater, container, false)
-        mapView = binding.mapView
+        Log.d(TAG, "onCreate called")
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        Log.d(TAG, "onCreate called")
+        mapView = binding.mapView
         //geodeticPathData = GeodeticPathData()
         app = requireActivity().application as MyApplication
         mapView.map = app.map
 //        val grid = LatitudeLongitudeGrid()
 //        mapView.grid = grid
-
+        viewModel = ViewModelProvider(this)[FragmentMainViewModel::class.java]
         repository = DataRepository(requireContext())
         viewModelFactory = ViewModelFactory(requireActivity().application as MyApplication)
         mapViewModel = ViewModelProvider(this, viewModelFactory)[MapViewModel::class.java]
@@ -96,15 +122,18 @@ class FragmentMain : Fragment() {
             ViewModelProvider(this, viewModelFactory)[GeodeticPathViewModel::class.java]
         graphicsOverlay = GraphicsOverlay()
         binding.mapView.graphicsOverlays.add(graphicsOverlay)
+        // Восстановление состояния из ViewModel
+        viewModel.selectedFeature.observe(viewLifecycleOwner) { feature ->
+            geodeticPathViewModel.selectedFeature = feature
+        }
+        viewModel.targetPoint.observe(viewLifecycleOwner) { point ->
+            geodeticPathViewModel.targetPoint = point
+        }
         val folder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")
-//        val folder: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-//            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")}
-//        else {
-//            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")
-//        }
         if (!folder.exists()) {
             folder.mkdirs()
         }
+
         locationDisplay = mapView.locationDisplay
         setupTouchListener()
         locationDisplay.startAsync()
@@ -145,25 +174,7 @@ class FragmentMain : Fragment() {
         }
 
 
-        locationDisplay.addLocationChangedListener { locationChangedEvent ->
-            val location = locationChangedEvent.location.position
-            val wgs84Point = GeometryEngine.project(location, SpatialReferences.getWgs84()) as Point
-            Log.d("LocationRepository", "Fragment - Location updated: $wgs84Point")
-
-            // Now use wgs84Point for your calculations:
-            trackRecorderViewModel.onLocationChanged(wgs84Point.x, wgs84Point.y)
-
-            if (geodeticPathViewModel.selectedFeature != null && geodeticPathViewModel.targetPoint != null) {
-                geodeticPathViewModel.calculateDistance(
-                    wgs84Point,
-                    geodeticPathViewModel.targetPoint!!
-                )
-                geodeticPathViewModel.calculateDeviation(
-                    wgs84Point,
-                    geodeticPathViewModel.polyline!!
-                )
-            }
-        }
+        locationDisplay.addLocationChangedListener(locationChangedListener)
 
         binding.buttonRecordTrack.setOnClickListener {
             trackRecorderViewModel.startStopRecording()
@@ -233,7 +244,7 @@ class FragmentMain : Fragment() {
 
         builder.setNegativeButton("Show Distance") { dialog, _ ->
             graphicsOverlay.graphics.clear()
-            geodeticPathViewModel.selectedFeature = identifiedFeature
+            viewModel.setSelectedFeature(identifiedFeature) // Сохраняем selectedFeature в ViewModel
             drawLineAndTrackDistance(identifiedFeature, screenPoint)
             dialog.dismiss()
             println("${geodeticPathViewModel.selectedFeature}")
@@ -359,11 +370,14 @@ class FragmentMain : Fragment() {
         super.onResume()
         mapView.resume()
     }
-
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null // Очищаем binding
+    }
     override fun onDestroy() {
-        mapView.dispose()
         super.onDestroy()
-        _binding = null
+        mapView.dispose()
+        //_binding = null
     }
 
 

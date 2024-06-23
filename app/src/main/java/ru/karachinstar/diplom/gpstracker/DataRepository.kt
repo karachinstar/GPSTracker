@@ -13,6 +13,7 @@ import android.util.Xml
 import android.widget.Toast
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import com.esri.arcgisruntime.arcgisservices.LabelDefinition
 import com.esri.arcgisruntime.data.ShapefileFeatureTable
 import com.esri.arcgisruntime.geometry.AngularUnit
 import com.esri.arcgisruntime.geometry.AngularUnitId
@@ -30,6 +31,7 @@ import com.esri.arcgisruntime.layers.KmlLayer
 import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.layers.RasterLayer
 import com.esri.arcgisruntime.loadable.LoadStatus
+import com.esri.arcgisruntime.mapping.labeling.LabelExpression
 import com.esri.arcgisruntime.mapping.view.Graphic
 import com.esri.arcgisruntime.ogc.kml.KmlDataset
 import com.esri.arcgisruntime.raster.Raster
@@ -37,6 +39,7 @@ import com.esri.arcgisruntime.symbology.SimpleFillSymbol
 import com.esri.arcgisruntime.symbology.SimpleLineSymbol
 import com.esri.arcgisruntime.symbology.SimpleMarkerSymbol
 import com.esri.arcgisruntime.symbology.SimpleRenderer
+import com.esri.arcgisruntime.symbology.TextSymbol
 import org.xmlpull.v1.XmlSerializer
 import java.io.OutputStream
 import java.text.SimpleDateFormat
