@@ -41,6 +41,7 @@ import com.esri.arcgisruntime.mapping.Viewpoint
 import com.esri.arcgisruntime.mapping.view.DefaultMapViewOnTouchListener
 import com.esri.arcgisruntime.mapping.view.Graphic
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
+import com.esri.arcgisruntime.mapping.view.LatitudeLongitudeGrid
 import com.esri.arcgisruntime.mapping.view.LocationDisplay
 import com.esri.arcgisruntime.mapping.view.MapView
 import com.esri.arcgisruntime.symbology.SimpleLineSymbol
@@ -75,6 +76,7 @@ class FragmentMain : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        setApiKeyForApp()
         _binding = MainFragmentBinding.inflate(inflater, container, false)
         mapView = binding.mapView
         return binding.root
@@ -83,10 +85,13 @@ class FragmentMain : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         requestPermissions()
-        setApiKeyForApp()
+
         //geodeticPathData = GeodeticPathData()
         app = requireActivity().application as MyApplication
         mapView.map = app.map
+//        val grid = LatitudeLongitudeGrid()
+//        mapView.grid = grid
+
         repository = DataRepository(requireContext())
         viewModelFactory = ViewModelFactory(repository)
         mapViewModel = ViewModelProvider(this, viewModelFactory)[MapViewModel::class.java]
@@ -124,7 +129,6 @@ class FragmentMain : Fragment() {
                 graphicsOverlay.graphics.clear()
                 geodeticPathViewModel.selectedFeature = null
                 geodeticPathViewModel.targetPoint = null
-                geodeticPathViewModel.polyline = null
                 graphicsOverlay.graphics.clear()
                 binding.distanceTextView.setBackgroundColor(Color.TRANSPARENT)
                 binding.distanceTextView.text = ""

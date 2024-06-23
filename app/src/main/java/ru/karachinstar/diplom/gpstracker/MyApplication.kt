@@ -1,6 +1,9 @@
 package ru.karachinstar.diplom.gpstracker
 
 import android.app.Application
+import android.content.Context
+import android.net.ConnectivityManager
+import com.esri.arcgisruntime.geometry.SpatialReference
 import com.esri.arcgisruntime.mapping.ArcGISMap
 import com.esri.arcgisruntime.mapping.BasemapStyle
 import leakcanary.AppWatcher
@@ -12,7 +15,21 @@ class MyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        map = ArcGISMap(BasemapStyle.OSM_STANDARD)
+
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetworkInfo = connectivityManager.activeNetworkInfo
+
+        val spatialReference = SpatialReference.create(28418)
+
+        map = if (activeNetworkInfo != null && activeNetworkInfo.isConnected) {
+            // Если есть интернет, устанавливаем первую карту
+            ArcGISMap(BasemapStyle.OSM_STANDARD)
+        } else {
+            // Если нет интернета, устанавливаем вторую карту
+            ArcGISMap(spatialReference)
+        }
+
         AppWatcher.config = AppWatcher.config.copy(watchActivities = true, watchFragments = true)
     }
 }
+
