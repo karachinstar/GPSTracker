@@ -15,6 +15,9 @@ class ViewModelFactory(private val application: MyApplication) : ViewModelProvid
         if (modelClass.isAssignableFrom(GeodeticPathViewModel::class.java)) {
             return GeodeticPathViewModel(application) as T
         }
+        if (modelClass.isAssignableFrom(PermissionsViewModel::class.java)) {
+            return PermissionsViewModel() as T
+        }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

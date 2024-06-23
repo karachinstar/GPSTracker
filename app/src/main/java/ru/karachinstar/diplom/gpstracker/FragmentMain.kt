@@ -80,8 +80,6 @@ class FragmentMain : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        requestPermissions()
-
         //geodeticPathData = GeodeticPathData()
         app = requireActivity().application as MyApplication
         mapView.map = app.map
@@ -99,15 +97,9 @@ class FragmentMain : Fragment() {
         graphicsOverlay = GraphicsOverlay()
         binding.mapView.graphicsOverlays.add(graphicsOverlay)
         val folder: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-                "GPSTracker/Track"
-            )
-        } else {
-            File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-                "Documents/GPSTracker/Track"
-            )
+            File(requireContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")}
+        else {
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")
         }
         if (!folder.exists()) {
             folder.mkdirs()
@@ -161,8 +153,14 @@ class FragmentMain : Fragment() {
             trackRecorderViewModel.onLocationChanged(wgs84Point.x, wgs84Point.y)
 
             if (geodeticPathViewModel.selectedFeature != null && geodeticPathViewModel.targetPoint != null) {
-                geodeticPathViewModel.calculateDistance(wgs84Point, geodeticPathViewModel.targetPoint!!)
-                geodeticPathViewModel.calculateDeviation(wgs84Point, geodeticPathViewModel.polyline!!)
+                geodeticPathViewModel.calculateDistance(
+                    wgs84Point,
+                    geodeticPathViewModel.targetPoint!!
+                )
+                geodeticPathViewModel.calculateDeviation(
+                    wgs84Point,
+                    geodeticPathViewModel.polyline!!
+                )
             }
         }
 
@@ -274,100 +272,32 @@ class FragmentMain : Fragment() {
             if (geodeticPathViewModel.targetPoint != null) {
                 // Отрисовать линию
                 val graphic =
-                    geodeticPathViewModel.drawLineAndTrackDistance(currentPoint, geodeticPathViewModel.targetPoint!!)
+                    geodeticPathViewModel.drawLineAndTrackDistance(
+                        currentPoint,
+                        geodeticPathViewModel.targetPoint!!
+                    )
                 graphicsOverlay.graphics.add(graphic)
 
                 // Рассчитать и отобразить расстояние
-                geodeticPathViewModel.calculateDistance(currentPoint, geodeticPathViewModel.targetPoint!!)
+                geodeticPathViewModel.calculateDistance(
+                    currentPoint,
+                    geodeticPathViewModel.targetPoint!!
+                )
 
                 // Рассчитать и отобразить отклонение
                 if (graphicsOverlay.graphics.isNotEmpty()) {
                     val line = graphicsOverlay.graphics[0]
                     geodeticPathViewModel.polyline = line.geometry as? Polyline
                     if (geodeticPathViewModel.polyline != null) {
-                        geodeticPathViewModel.calculateDeviation(currentPoint, geodeticPathViewModel.polyline!!)
+                        geodeticPathViewModel.calculateDeviation(
+                            currentPoint,
+                            geodeticPathViewModel.polyline!!
+                        )
                     }
                 }
             }
         }
     }
-
-
-    private fun requestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                startActivityForResult(intent, MY_PERMISSIONS_REQUEST_MANAGE_EXTERNAL_STORAGE)
-            }
-        } else {
-            if (ContextCompat.checkSelfPermission(
-                    requireContext(),
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                )
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                ActivityCompat.requestPermissions(
-                    requireActivity(),
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE
-                )
-            }
-        }
-        // Запрос разрешения ACCESS_FINE_LOCATION
-        if (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                requireActivity(),
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION
-            )
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        when (requestCode) {
-            MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE -> {
-                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    // Разрешение было предоставлено
-                } else {
-                    // Разрешение было отклонено
-                    Toast.makeText(
-                        requireContext(),
-                        "Permission denied to write to external storage",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-
-            MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION -> {
-                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    // Разрешение на доступ к местоположению было предоставлено
-                } else {
-                    // Разрешение на доступ к местоположению было отклонено
-                    Toast.makeText(
-                        requireContext(),
-                        "Permission denied to access fine location",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-            // Другие 'case' строки для проверки других
-            // разрешений, запрашиваемых этим приложением.
-            else -> {
-                // Игнорировать все другие запросы разрешений
-            }
-        }
-    }
-
 
     private fun openFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -380,18 +310,16 @@ class FragmentMain : Fragment() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == MY_PERMISSIONS_REQUEST_MANAGE_EXTERNAL_STORAGE) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                if (!Environment.isExternalStorageManager()) {
-                    // Разрешение не было предоставлено
-                    Toast.makeText(
-                        requireContext(),
-                        "Permission denied to manage external storage",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                // Разрешение не было предоставлено
+                Toast.makeText(
+                    requireContext(),
+                    "Permission denied to manage external storage",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
-        } else if (requestCode == OPEN_FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
+        } else if (resultCode == Activity.RESULT_OK) {
             val uri = data?.data // Uri выбранного файла
             if (uri != null) {
                 handleFile(uri)
@@ -455,9 +383,6 @@ class FragmentMain : Fragment() {
     }
 
     companion object {
-        private const val MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1
-        private const val MY_PERMISSIONS_REQUEST_MANAGE_EXTERNAL_STORAGE = 2
-        private const val MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 4
         private const val OPEN_FILE_REQUEST_CODE = 3
     }
 
