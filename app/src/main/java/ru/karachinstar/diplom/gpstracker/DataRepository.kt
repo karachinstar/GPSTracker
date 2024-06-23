@@ -69,6 +69,7 @@ class DataRepository(private val context: Context) {
     fun loadShapefile(uri: Uri): LiveData<FeatureLayer> {
         val result = MutableLiveData<FeatureLayer>()
         val fullPath = getFullPath(uri)
+        println(fullPath)
         val shapefileFeatureTable = ShapefileFeatureTable(fullPath)
         shapefileFeatureTable.loadAsync()
         shapefileFeatureTable.addDoneLoadingListener {

@@ -96,11 +96,12 @@ class FragmentMain : Fragment() {
             ViewModelProvider(this, viewModelFactory)[GeodeticPathViewModel::class.java]
         graphicsOverlay = GraphicsOverlay()
         binding.mapView.graphicsOverlays.add(graphicsOverlay)
-        val folder: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            File(requireContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")}
-        else {
-            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")
-        }
+        val folder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")
+//        val folder: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+//            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")}
+//        else {
+//            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "GPSTracker/Track")
+//        }
         if (!folder.exists()) {
             folder.mkdirs()
         }
@@ -310,16 +311,7 @@ class FragmentMain : Fragment() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                // Разрешение не было предоставлено
-                Toast.makeText(
-                    requireContext(),
-                    "Permission denied to manage external storage",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        } else if (resultCode == Activity.RESULT_OK) {
+        if (requestCode == OPEN_FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
             val uri = data?.data // Uri выбранного файла
             if (uri != null) {
                 handleFile(uri)

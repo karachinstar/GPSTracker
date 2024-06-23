@@ -21,31 +21,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ActivityResultLauncher для запроса разрешения на управление файлами
-    private val manageStoragePermissionLauncher: ActivityResultLauncher<Intent> by lazy {
-        registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                if (Environment.isExternalStorageManager()) {
-                    // Разрешение на управление файлами предоставлено
-                    viewModel.requestPermissions(this, requestPermissionLauncher, manageStoragePermissionLauncher)
-                } else {
-                    // Обработка отказа в разрешении на управление файлами
-                }
-            }
-        }
-    }
+//    // ActivityResultLauncher для запроса разрешения на управление файлами
+//    private val manageStoragePermissionLauncher: ActivityResultLauncher<Intent> by lazy {
+//        registerForActivityResult(
+//            ActivityResultContracts.StartActivityForResult()
+//        ) { result ->
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+//                if (Environment.isExternalStorageManager()) {
+//                    // Разрешение на управление файлами предоставлено
+//                    viewModel.requestPermissions(this, requestPermissionLauncher, manageStoragePermissionLauncher)
+//                } else {
+//                    // Обработка отказа в разрешении на управление файлами
+//                }
+//            }
+//        }
+//    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Инициализируем оба ActivityResultLauncher
+        // Инициализируем ActivityResultLauncher
         requestPermissionLauncher
-        manageStoragePermissionLauncher
 
         // Запрашиваем разрешения
-        viewModel.requestPermissions(this, requestPermissionLauncher, manageStoragePermissionLauncher)
+        viewModel.requestPermissions(this, requestPermissionLauncher)
 
         viewModel.permissionsGranted.observe(this) { granted ->
             if (granted) {
