@@ -65,6 +65,7 @@ class FragmentMain : Fragment() {
     private lateinit var locationViewModel: LocationViewModel
     private lateinit var graphicsOverlay: GraphicsOverlay
     private lateinit var app: MyApplication
+    private lateinit var locationDisplay: LocationDisplay
     private var selectedFeature: Feature? = null
     private var targetPoint: Point? = null
     private var polyline: Polyline? = null
@@ -76,15 +77,8 @@ class FragmentMain : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = MainFragmentBinding.inflate(inflater, container, false)
-        if (!this::mapView.isInitialized) {
-
-            mapView = binding.mapView
-        }
-
-        //mapView = binding.mapView
-        locationRepository = LocationRepository(mapView)
-
-
+        mapView = binding.mapView
+        //locationRepository = LocationRepository(mapView)
         return binding.root
     }
 
@@ -95,17 +89,16 @@ class FragmentMain : Fragment() {
         app = requireActivity().application as MyApplication
         mapView.map = app.map
         repository = DataRepository(requireContext())
-        viewModelFactory = ViewModelFactory(repository, locationRepository)
+        viewModelFactory = ViewModelFactory(repository)
         mapViewModel = ViewModelProvider(this, viewModelFactory)[MapViewModel::class.java]
         setupMap()
         trackRecorderViewModel =
             ViewModelProvider(this, viewModelFactory)[TrackRecorderViewModel::class.java]
         geodeticPathViewModel =
             ViewModelProvider(this, viewModelFactory)[GeodeticPathViewModel::class.java]
-        locationViewModel = ViewModelProvider(this, viewModelFactory)[LocationViewModel::class.java]
+//        locationViewModel = ViewModelProvider(this, viewModelFactory)[LocationViewModel::class.java]
         graphicsOverlay = GraphicsOverlay()
         binding.mapView.graphicsOverlays.add(graphicsOverlay)
-        // println("${locationDisplay.location.position.x}, ${locationDisplay.location.position.y}")
         val folder: File = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             File(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
@@ -120,8 +113,10 @@ class FragmentMain : Fragment() {
         if (!folder.exists()) {
             folder.mkdirs()
         }
+        locationDisplay = mapView.locationDisplay
         setupTouchListener()
-        locationViewModel.start()
+        locationDisplay.startAsync()
+
         geodeticPathViewModel.distance.observe(viewLifecycleOwner) { distance ->
             // Обновите текстовое поле для расстояния
             binding.distanceTextView.setBackgroundColor(Color.WHITE)
@@ -158,14 +153,17 @@ class FragmentMain : Fragment() {
         }
 
 
-        locationViewModel.location.observe(viewLifecycleOwner) { location ->
-            Log.d("LocationRepository", "Fragment - Location updated: $location\n selectedFeature - " +
-                    "$selectedFeature and targetPoint = $targetPoint\"")
-            trackRecorderViewModel.onLocationChanged(location.x, location.y)
-            // Если есть выбранная линия и целевая точка
+        locationDisplay.addLocationChangedListener { locationChangedEvent ->
+            val location = locationChangedEvent.location.position
+            val wgs84Point = GeometryEngine.project(location, SpatialReferences.getWgs84()) as Point
+            Log.d("LocationRepository", "Fragment - Location updated: $wgs84Point")
+
+            // Now use wgs84Point for your calculations:
+            trackRecorderViewModel.onLocationChanged(wgs84Point.x, wgs84Point.y)
+
             if (selectedFeature != null && targetPoint != null) {
-                geodeticPathViewModel.calculateDistance(location, targetPoint!!)
-                geodeticPathViewModel.calculateDeviation(location, polyline!!)
+                geodeticPathViewModel.calculateDistance(wgs84Point, targetPoint!!)
+                geodeticPathViewModel.calculateDeviation(wgs84Point, polyline!!)
             }
         }
 
@@ -251,10 +249,13 @@ class FragmentMain : Fragment() {
         screenPoint: android.graphics.Point
     ) {
         // Получить текущее местоположение
-        val currentLocation = locationViewModel.location.value
+        val currentLocation = locationDisplay?.location?.position
         val mapPoint = binding.mapView.screenToLocation(screenPoint)
         val wgs84Point = GeometryEngine.project(mapPoint, SpatialReferences.getWgs84()) as Point
-        println("WGS84 координаты: ${wgs84Point.y}, ${wgs84Point.x}")
+        println(
+            "WGS84 координаты: ${wgs84Point.y}, ${wgs84Point.x}\n" +
+                    "$currentLocation"
+        )
 
         if (currentLocation != null) {
             val currentPoint =
@@ -368,7 +369,6 @@ class FragmentMain : Fragment() {
     }
 
 
-
     private fun openFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -433,7 +433,7 @@ class FragmentMain : Fragment() {
         mapViewModel.mapCenter = mapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE)
         mapView.map.operationalLayers.clear()
         graphicsOverlay.graphics.clear()
-        locationViewModel.stop()
+        //locationViewModel.stop()
         mapView.pause()
         super.onPause()
     }
@@ -441,16 +441,15 @@ class FragmentMain : Fragment() {
     override fun onResume() {
         super.onResume()
         mapView.resume()
-        locationViewModel.start()
+        //locationViewModel.start()
     }
+
     override fun onDestroy() {
         mapView.dispose()
         //locationViewModel.stop()
         super.onDestroy()
         _binding = null
     }
-
-
 
 
     private fun setApiKeyForApp() {
@@ -466,7 +465,6 @@ class FragmentMain : Fragment() {
         private const val MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 4
         private const val OPEN_FILE_REQUEST_CODE = 3
     }
-
 
 
 }

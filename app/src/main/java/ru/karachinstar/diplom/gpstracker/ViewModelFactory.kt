@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 
-class ViewModelFactory(private val trackRecorder: DataRepository, private val locationRepository: LocationRepository) : ViewModelProvider.Factory {
+class ViewModelFactory(private val trackRecorder: DataRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         if (modelClass.isAssignableFrom(TrackRecorderViewModel::class.java)) {
             return TrackRecorderViewModel(trackRecorder) as T
@@ -14,9 +14,6 @@ class ViewModelFactory(private val trackRecorder: DataRepository, private val lo
         }
         if (modelClass.isAssignableFrom(GeodeticPathViewModel::class.java)) {
             return GeodeticPathViewModel(trackRecorder) as T
-        }
-        if (modelClass.isAssignableFrom(LocationViewModel::class.java)) {
-            return LocationViewModel(locationRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
