@@ -1,5 +1,7 @@
 package ru.karachinstar.diplom.gpstracker
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
 import com.esri.arcgisruntime.data.Feature
@@ -7,7 +9,8 @@ import com.esri.arcgisruntime.geometry.Point
 import com.esri.arcgisruntime.geometry.Polyline
 import com.esri.arcgisruntime.mapping.view.Graphic
 
-class GeodeticPathViewModel(private val repository: DataRepository) : ViewModel() {
+class GeodeticPathViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: DataRepository =DataRepository(application)
     val distance: LiveData<Double> = repository.distance
     val deviation: LiveData<Double> = repository.deviation
     val graphic: LiveData<Graphic> = repository.graphic

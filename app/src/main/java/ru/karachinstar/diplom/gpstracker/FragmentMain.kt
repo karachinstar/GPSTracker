@@ -65,10 +65,6 @@ class FragmentMain : Fragment() {
     private lateinit var graphicsOverlay: GraphicsOverlay
     private lateinit var app: MyApplication
     private lateinit var locationDisplay: LocationDisplay
-//    private var geodeticPathData: GeodeticPathData? = null
-//    private var selectedFeature: Feature? = null
-//    private var targetPoint: Point? = null
-//    private var polyline: Polyline? = null
 
 
     override fun onCreateView(
@@ -93,7 +89,7 @@ class FragmentMain : Fragment() {
 //        mapView.grid = grid
 
         repository = DataRepository(requireContext())
-        viewModelFactory = ViewModelFactory(repository)
+        viewModelFactory = ViewModelFactory(requireActivity().application as MyApplication)
         mapViewModel = ViewModelProvider(this, viewModelFactory)[MapViewModel::class.java]
         setupMap()
         trackRecorderViewModel =
@@ -434,6 +430,7 @@ class FragmentMain : Fragment() {
         mapViewModel.mapCenter = mapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE)
         mapView.map.operationalLayers.clear()
         graphicsOverlay.graphics.clear()
+
         mapView.pause()
         super.onPause()
     }
