@@ -1,14 +1,18 @@
 package ru.karachinstar.diplom.gpstracker
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.MutableLiveData
 
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: PermissionsViewModel by viewModels()
+    private lateinit var manageStorageRequestLauncher: ActivityResultLauncher<Intent>
 
     // ActivityResultLauncher для запроса остальных разрешений
     private val requestPermissionLauncher: ActivityResultLauncher<Array<String>> by lazy {
@@ -19,14 +23,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        manageStorageRequestLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                viewModel.checkAllPermissionsGranted(this)
+            } else {
+                (viewModel.permissionsGranted as MutableLiveData<Boolean>).postValue(false) // Теперь работает корректно
+            }
+        }
 
         // Инициализируем ActivityResultLauncher
         requestPermissionLauncher
 
         // Запрашиваем разрешения
-        viewModel.requestPermissions(this, requestPermissionLauncher)
+        viewModel.requestPermissions(this, requestPermissionLauncher, manageStorageRequestLauncher)
 
         viewModel.permissionsGranted.observe(this) { granted ->
             if (granted) {
