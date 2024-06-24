@@ -141,9 +141,11 @@ class DataRepository(private val context: Context) {
                             color = Color.BLUE // Цвет текста
                             haloColor = Color.WHITE // Цвет обводки
                             haloWidth = 2f // Ширина обводки в пикселях
+
                         }
                         val graphic = Graphic(point, textSymbol)
                         graphicsOverlay.graphics.add(graphic)
+
                     }
                 }
 
