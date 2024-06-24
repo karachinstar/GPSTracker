@@ -304,7 +304,7 @@ class DataRepository(private val context: Context) {
     fun drawLineAndTrackDistance(currentPoint: Point, targetPoint: Point): Graphic {
         // Отрисовать линию
         val line = PolylineBuilder(SpatialReferences.getWgs84())
-        val lineSymbol = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.RED, 2f)
+        val lineSymbol = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.MAGENTA, 4f)
         line.addPoint(currentPoint)
         line.addPoint(targetPoint)
         _graphic.value = Graphic(line.toGeometry(), lineSymbol)

@@ -182,6 +182,9 @@ class FragmentMain : Fragment() {
         binding.loadFileButton.setOnClickListener {
             openFile()
         }
+        binding.buttonGPS.setOnClickListener {
+            locationDisplay.autoPanMode = LocationDisplay.AutoPanMode.COMPASS_NAVIGATION
+        }
         // Наблюдение за изменениями в слоях
         mapViewModel.layers.observe(viewLifecycleOwner) { layers ->
             // Обновление слоев на карте

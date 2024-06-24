@@ -26,6 +26,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="20dp"
+        android:textColor="@color/black"
+        android:textSize="10pt"
+        android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -33,25 +36,41 @@
         android:id="@+id/deviationTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:textColor="@color/black"
+        android:textStyle="bold"
+        android:textSize="10pt"
         android:layout_margin="20dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-    <Button
+    <ImageButton
         android:id="@+id/loadFileButton"
+        android:background="@drawable/directory_documents_svgrepo_com__1_"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_margin="20dp"
-        android:text="..."
+        android:layout_margin="25dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <Button
+    <ImageButton
         android:id="@+id/buttonRecordTrack"
+        android:background="@drawable/rec_svgrepo_com"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_margin="20dp"
+        android:layout_margin="25dp"
         android:text="..."
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <ImageButton
+        android:id="@+id/buttonGPS"
+        android:background="@drawable/gps_svgrepo_com"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="25dp"
+        android:text="..."
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         />
 
