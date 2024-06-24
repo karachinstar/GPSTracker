@@ -5,9 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
+import com.esri.arcgisruntime.data.Feature
 import com.esri.arcgisruntime.geometry.Point
 import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.mapping.Viewpoint
+import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
 
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
@@ -16,8 +18,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     //var mapScale: Double = 72000.0
     var mapCenter: Viewpoint = Viewpoint(52.2750, 104.2605, 72000.0)
 
-    fun loadShapefile(uri: Uri) {
-        repository.loadShapefile(uri)
+    fun loadShapefile(uri: Uri, graphicsOverlay: GraphicsOverlay) {
+        repository.loadShapefile(uri, graphicsOverlay)
     }
 
     fun loadGeoTiff(uri: Uri) {
@@ -27,6 +29,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun loadKMLfile(uri: Uri) {
         repository.loadKMLfile(uri)
     }
+
+    fun getFilteredAttributesForFeature(feature: Feature): Map<String, Any> {
+        return repository.getFilteredAttributes(feature)
+    }
+
+
 
     // Ваши другие методы
 }

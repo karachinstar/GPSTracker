@@ -10,41 +10,26 @@ import android.net.Uri
 
 import android.os.Bundle
 import android.os.Environment
-import android.os.Parcelable
-import android.provider.Settings
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.esri.arcgisruntime.ArcGISRuntimeEnvironment
 import com.esri.arcgisruntime.data.Feature
-import com.esri.arcgisruntime.geometry.AngularUnit
-import com.esri.arcgisruntime.geometry.AngularUnitId
-import com.esri.arcgisruntime.geometry.GeodeticCurveType
 import com.esri.arcgisruntime.geometry.GeometryEngine
-import com.esri.arcgisruntime.geometry.LinearUnit
-import com.esri.arcgisruntime.geometry.LinearUnitId
 import com.esri.arcgisruntime.geometry.Point
 import com.esri.arcgisruntime.geometry.Polygon
 import com.esri.arcgisruntime.geometry.Polyline
-import com.esri.arcgisruntime.geometry.PolylineBuilder
 import com.esri.arcgisruntime.geometry.SpatialReferences
-import com.esri.arcgisruntime.mapping.ArcGISMap
-import com.esri.arcgisruntime.mapping.BasemapStyle
 import com.esri.arcgisruntime.mapping.Viewpoint
 import com.esri.arcgisruntime.mapping.view.DefaultMapViewOnTouchListener
-import com.esri.arcgisruntime.mapping.view.Graphic
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
-import com.esri.arcgisruntime.mapping.view.LatitudeLongitudeGrid
 import com.esri.arcgisruntime.mapping.view.LocationDisplay
 import com.esri.arcgisruntime.mapping.view.MapView
-import com.esri.arcgisruntime.symbology.SimpleLineSymbol
 
 import ru.karachinstar.diplom.gpstracker.databinding.MainFragmentBinding
 import java.io.File
@@ -63,7 +48,9 @@ class FragmentMain : Fragment() {
     private lateinit var mapViewModel: MapViewModel
     private lateinit var trackRecorderViewModel: TrackRecorderViewModel
     private lateinit var geodeticPathViewModel: GeodeticPathViewModel
-    private lateinit var graphicsOverlay: GraphicsOverlay
+    private lateinit var lineGraphicsOverlay: GraphicsOverlay
+    private lateinit var labelGraphicsOverlay: GraphicsOverlay
+
     private lateinit var app: MyApplication
     private lateinit var locationDisplay: LocationDisplay
     private val TAG = "FragmentMain"
@@ -120,8 +107,10 @@ class FragmentMain : Fragment() {
             ViewModelProvider(this, viewModelFactory)[TrackRecorderViewModel::class.java]
         geodeticPathViewModel =
             ViewModelProvider(this, viewModelFactory)[GeodeticPathViewModel::class.java]
-        graphicsOverlay = GraphicsOverlay()
-        binding.mapView.graphicsOverlays.add(graphicsOverlay)
+        lineGraphicsOverlay = GraphicsOverlay()
+        labelGraphicsOverlay = GraphicsOverlay()
+        binding.mapView.graphicsOverlays.add(lineGraphicsOverlay)
+        binding.mapView.graphicsOverlays.add(labelGraphicsOverlay)
         // Восстановление состояния из ViewModel
         viewModel.selectedFeature.observe(viewLifecycleOwner) { feature ->
             geodeticPathViewModel.selectedFeature = feature
@@ -144,10 +133,10 @@ class FragmentMain : Fragment() {
             val formattedDistance = String.format("%.2f", distance)
             binding.distanceTextView.text = "Расстояние:\n $formattedDistance m"
             if (distance <= 1) {
-                graphicsOverlay.graphics.clear()
+                lineGraphicsOverlay.graphics.clear()
                 geodeticPathViewModel.selectedFeature = null
                 geodeticPathViewModel.targetPoint = null
-                graphicsOverlay.graphics.clear()
+                lineGraphicsOverlay.graphics.clear()
                 binding.distanceTextView.setBackgroundColor(Color.TRANSPARENT)
                 binding.distanceTextView.text = ""
             }
@@ -166,11 +155,11 @@ class FragmentMain : Fragment() {
 
         geodeticPathViewModel.graphic.observe(viewLifecycleOwner) { graphic ->
             // Удалите старую графику
-            if (graphicsOverlay.graphics.size > 0) {
-                graphicsOverlay.graphics.removeAt(0)
+            if (lineGraphicsOverlay.graphics.size > 0) {
+                lineGraphicsOverlay.graphics.removeAt(0)
             }
             // Добавьте новую графику
-            graphicsOverlay.graphics.add(graphic)
+            lineGraphicsOverlay.graphics.add(graphic)
         }
 
 
@@ -229,28 +218,32 @@ class FragmentMain : Fragment() {
         val builder = AlertDialog.Builder(requireContext())
         builder.setTitle("Feature Information")
 
-        val filteredAttributes = attributes.filterKeys { key ->
-            key in listOf(
-                "MD",
-                "PK",
-                "Offset",
-                "Profile"
-            )
-        }
+//        val filteredAttributes = attributes.filterKeys { key ->
+//            key in listOf(
+//                "MD",
+//                "PK",
+//                "Offset",
+//                "Profile"
+//            )
+//        }
+//
+//        val message = filteredAttributes.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+//        builder.setMessage(message)
+
+        val filteredAttributes = mapViewModel.getFilteredAttributesForFeature(identifiedFeature)
+        //showInfoDialog(filteredAttributes, identifiedFeature, screenPoint)
 
         val message = filteredAttributes.entries.joinToString("\n") { "${it.key}: ${it.value}" }
         builder.setMessage(message)
 
         builder.setPositiveButton("OK") { dialog, _ ->
-            dialog.dismiss()
-        }
+            dialog.dismiss()}
 
         builder.setNegativeButton("Show Distance") { dialog, _ ->
-            graphicsOverlay.graphics.clear()
+            lineGraphicsOverlay.graphics.clear()
             viewModel.setSelectedFeature(identifiedFeature) // Сохраняем selectedFeature в ViewModel
             drawLineAndTrackDistance(identifiedFeature, screenPoint)
             dialog.dismiss()
-            println("${geodeticPathViewModel.selectedFeature}")
         }
 
         val dialog = builder.create()
@@ -265,10 +258,6 @@ class FragmentMain : Fragment() {
         val currentLocation = locationDisplay?.location?.position
         val mapPoint = binding.mapView.screenToLocation(screenPoint)
         val wgs84Point = GeometryEngine.project(mapPoint, SpatialReferences.getWgs84()) as Point
-        println(
-            "WGS84 координаты: ${wgs84Point.y}, ${wgs84Point.x}\n" +
-                    "$currentLocation"
-        )
 
         if (currentLocation != null) {
             val currentPoint =
@@ -291,7 +280,7 @@ class FragmentMain : Fragment() {
                         currentPoint,
                         geodeticPathViewModel.targetPoint!!
                     )
-                graphicsOverlay.graphics.add(graphic)
+                lineGraphicsOverlay.graphics.add(graphic)
 
                 // Рассчитать и отобразить расстояние
                 geodeticPathViewModel.calculateDistance(
@@ -300,8 +289,8 @@ class FragmentMain : Fragment() {
                 )
 
                 // Рассчитать и отобразить отклонение
-                if (graphicsOverlay.graphics.isNotEmpty()) {
-                    val line = graphicsOverlay.graphics[0]
+                if (lineGraphicsOverlay.graphics.isNotEmpty()) {
+                    val line = lineGraphicsOverlay.graphics[0]
                     geodeticPathViewModel.polyline = line.geometry as? Polyline
                     if (geodeticPathViewModel.polyline != null) {
                         geodeticPathViewModel.calculateDeviation(
@@ -341,7 +330,7 @@ class FragmentMain : Fragment() {
         when (format) {
             "tif" -> mapViewModel.loadGeoTiff(uri)
             "shp" -> {
-                mapViewModel.loadShapefile(uri)
+                mapViewModel.loadShapefile(uri, labelGraphicsOverlay)
             }
 
             "kml" -> {
@@ -363,7 +352,7 @@ class FragmentMain : Fragment() {
     override fun onPause() {
         mapViewModel.mapCenter = mapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE)
         mapView.map.operationalLayers.clear()
-        graphicsOverlay.graphics.clear()
+        lineGraphicsOverlay.graphics.clear()
 
         mapView.pause()
         super.onPause()

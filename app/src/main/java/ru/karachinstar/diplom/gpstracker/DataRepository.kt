@@ -10,10 +10,13 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Xml
+
 import android.widget.Toast
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.esri.arcgisruntime.arcgisservices.LabelDefinition
+import com.esri.arcgisruntime.data.Feature
+import com.esri.arcgisruntime.data.QueryParameters
 import com.esri.arcgisruntime.data.ShapefileFeatureTable
 import com.esri.arcgisruntime.geometry.AngularUnit
 import com.esri.arcgisruntime.geometry.AngularUnitId
@@ -23,6 +26,7 @@ import com.esri.arcgisruntime.geometry.GeometryType
 import com.esri.arcgisruntime.geometry.LinearUnit
 import com.esri.arcgisruntime.geometry.LinearUnitId
 import com.esri.arcgisruntime.geometry.Point
+import com.esri.arcgisruntime.geometry.Polygon
 import com.esri.arcgisruntime.geometry.Polyline
 import com.esri.arcgisruntime.geometry.PolylineBuilder
 import com.esri.arcgisruntime.geometry.SpatialReferences
@@ -33,6 +37,7 @@ import com.esri.arcgisruntime.layers.RasterLayer
 import com.esri.arcgisruntime.loadable.LoadStatus
 import com.esri.arcgisruntime.mapping.labeling.LabelExpression
 import com.esri.arcgisruntime.mapping.view.Graphic
+import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
 import com.esri.arcgisruntime.ogc.kml.KmlDataset
 import com.esri.arcgisruntime.raster.Raster
 import com.esri.arcgisruntime.symbology.SimpleFillSymbol
@@ -69,7 +74,7 @@ class DataRepository(private val context: Context) {
     /**
      * Methods loading file
      */
-    fun loadShapefile(uri: Uri): LiveData<FeatureLayer> {
+    fun loadShapefile(uri: Uri, graphicsOverlay: GraphicsOverlay): LiveData<FeatureLayer> {
         val result = MutableLiveData<FeatureLayer>()
         val fullPath = getFullPath(uri)
         println(fullPath)
@@ -78,6 +83,7 @@ class DataRepository(private val context: Context) {
         shapefileFeatureTable.addDoneLoadingListener {
             if (shapefileFeatureTable.loadStatus == LoadStatus.LOADED) {
                 val featureLayer = FeatureLayer(shapefileFeatureTable)
+
                 // Проверка типа геометрии слоя
                 when (featureLayer.featureTable.geometryType) {
                     GeometryType.POINT -> {
@@ -113,6 +119,34 @@ class DataRepository(private val context: Context) {
                     GeometryType.MULTIPOINT -> TODO()
                     GeometryType.UNKNOWN -> TODO()
                 }
+                // Получаем объекты из слоя
+                val features = shapefileFeatureTable.queryFeaturesAsync(QueryParameters()).get()
+
+                // Для каждой точки создаем текстовый графический объект
+                for (feature in features) {
+                    if (feature.geometry is Point) {
+                        val point = feature.geometry as Point
+                        val pkValue = (feature.attributes["PK"] as? Number)?.toInt()?.toString() ?: "" // Получаем значение атрибута PK
+                        val textSymbol = TextSymbol(14f, pkValue, Color.RED, TextSymbol.HorizontalAlignment.RIGHT, TextSymbol.VerticalAlignment.TOP).apply {
+                            color = Color.RED // Цвет текста
+                            haloColor = Color.WHITE // Цвет обводки
+                            haloWidth = 2f // Ширина обводки в пикселях
+                        }
+                        val graphic = Graphic(point, textSymbol)
+                        graphicsOverlay.graphics.add(graphic)
+                    } else if (feature.geometry is Polygon) {
+                        val point = feature.geometry as Polygon
+                        val pkValue = (feature.attributes["MD"] as? Number)?.toInt()?.toString() ?: "" // Получаем значение атрибута PK
+                        val textSymbol = TextSymbol(14f, pkValue, Color.BLUE, TextSymbol.HorizontalAlignment.LEFT, TextSymbol.VerticalAlignment.BOTTOM).apply {
+                            color = Color.BLUE // Цвет текста
+                            haloColor = Color.WHITE // Цвет обводки
+                            haloWidth = 2f // Ширина обводки в пикселях
+                        }
+                        val graphic = Graphic(point, textSymbol)
+                        graphicsOverlay.graphics.add(graphic)
+                    }
+                }
+
                 _layers.value = _layers.value?.plus(featureLayer) ?: listOf(featureLayer)
                 result.value = featureLayer
             } else {
@@ -128,6 +162,7 @@ class DataRepository(private val context: Context) {
     fun loadGeoTiff(uri: Uri): LiveData<RasterLayer> {
         val result = MutableLiveData<RasterLayer>()
         val fullPath = getFullPath(uri)
+        println(fullPath)
         val raster = Raster(fullPath)
         val rasterLayer = RasterLayer(raster)
         _layers.value = _layers.value?.plus(rasterLayer) ?: listOf(rasterLayer)
@@ -138,6 +173,7 @@ class DataRepository(private val context: Context) {
     fun loadKMLfile(uri: Uri): LiveData<KmlLayer> {
         val result = MutableLiveData<KmlLayer>()
         val fullPath = getFullPath(uri)
+        println(fullPath)
         // Создание KmlDataset из Uri
         val kmlDataset = KmlDataset(fullPath)
 
@@ -175,13 +211,16 @@ class DataRepository(private val context: Context) {
 
     fun getFullPath(uri: Uri): String {
         val path = uri.path?.substringAfter(":") // Получение пути к файлу из Uri
+
         return when {
             uri.path?.startsWith("/document/primary:") == true -> {
                 "/storage/emulated/0/$path"
             }
+
             uri.path?.startsWith("/document/home:") == true -> {
                 "/storage/emulated/0/Documents/$path"
             }
+
             else -> {
                 // Обработка других случаев
                 path ?: ""
@@ -281,7 +320,6 @@ class DataRepository(private val context: Context) {
 
     fun writeLocation(longitude: Double, latitude: Double) {
         xmlSerializer?.text("$longitude,$latitude,0 ")
-        println("Я записываю $longitude, $latitude")
     }
 
     fun finishRecording() {
@@ -313,16 +351,30 @@ class DataRepository(private val context: Context) {
 
     fun calculateDistance(currentPoint: Point, targetPoint: Point) {
         // Рассчитать и отобразить расстояние
-        val distance = GeometryEngine.distanceGeodetic(currentPoint, targetPoint, LinearUnit(
-            LinearUnitId.KILOMETERS), AngularUnit(AngularUnitId.DEGREES), GeodeticCurveType.GEODESIC)
+        val distance = GeometryEngine.distanceGeodetic(
+            currentPoint, targetPoint, LinearUnit(
+                LinearUnitId.KILOMETERS
+            ), AngularUnit(AngularUnitId.DEGREES), GeodeticCurveType.GEODESIC
+        )
         _distance.value = distance.getDistance() * 1000
     }
 
     fun calculateDeviation(currentPoint: Point, polyline: Polyline) {
         // Рассчитать и отобразить отклонение
         val nearestCoordinate = GeometryEngine.nearestCoordinate(polyline, currentPoint)
-        val deviation = GeometryEngine.distanceGeodetic(currentPoint, nearestCoordinate.getCoordinate(),
-            LinearUnit(LinearUnitId.KILOMETERS), AngularUnit(AngularUnitId.DEGREES), GeodeticCurveType.GEODESIC)
+        val deviation = GeometryEngine.distanceGeodetic(
+            currentPoint,
+            nearestCoordinate.getCoordinate(),
+            LinearUnit(LinearUnitId.KILOMETERS),
+            AngularUnit(AngularUnitId.DEGREES),
+            GeodeticCurveType.GEODESIC
+        )
         _deviation.value = (deviation.getDistance() * 1000)
+    }
+
+    fun getFilteredAttributes(feature: Feature): Map<String, Any> {
+        return feature.attributes.filterKeys { key ->
+            key in listOf("MD", "PK", "Offset", "Profile", "ID")
+        }
     }
 }
