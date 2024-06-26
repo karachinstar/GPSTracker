@@ -22,7 +22,10 @@ class PermissionsViewModel : ViewModel() {
     val permissionsGranted: LiveData<Boolean> = _permissionsGranted
 
     // Функция для запроса разрешений
-    fun requestPermissions(activity: Activity, requestPermissionLauncher: ActivityResultLauncher<Array<String>>, manageStorageRequestLauncher: ActivityResultLauncher<Intent>) {
+    fun requestPermissions(activity: Activity,
+                           requestPermissionLauncher: ActivityResultLauncher<Array<String>>,
+                           manageStorageRequestLauncher: ActivityResultLauncher<Intent>)
+    {
         val permissionsToRequest = mutableListOf<String>()
 
         //Проверка разрешения на доступ к точному местоположению
@@ -32,17 +35,20 @@ class PermissionsViewModel : ViewModel() {
 
         // Проверка разрешения на доступ к приблизительному местоположению (для Android 14 и выше)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            ContextCompat.checkSelfPermission(activity, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ContextCompat.checkSelfPermission(activity,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(android.Manifest.permission.ACCESS_COARSE_LOCATION)
         }
 
         // Запрос разрешений для точного местоположения в фоновом режиме
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // Android 12 и выше
-            if (ContextCompat.checkSelfPermission(activity, android.Manifest.permission.SCHEDULE_EXACT_ALARM) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(activity,
+                    android.Manifest.permission.SCHEDULE_EXACT_ALARM) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(android.Manifest.permission.SCHEDULE_EXACT_ALARM)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13 и выше
-                if (ContextCompat.checkSelfPermission(activity, android.Manifest.permission.USE_EXACT_ALARM) != PackageManager.PERMISSION_GRANTED) {
+                if (ContextCompat.checkSelfPermission(activity,
+                        android.Manifest.permission.USE_EXACT_ALARM) != PackageManager.PERMISSION_GRANTED) {
                     permissionsToRequest.add(android.Manifest.permission.USE_EXACT_ALARM)
                 }
             }
@@ -95,7 +101,8 @@ class PermissionsViewModel : ViewModel() {
     fun checkAllPermissionsGranted(activity: Activity) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             _permissionsGranted.value = Environment.isExternalStorageManager() &&
-                    ContextCompat.checkSelfPermission(activity, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(activity,
+                        android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
                     (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE || ContextCompat.checkSelfPermission(activity, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
         } else {
             _permissionsGranted.value = ContextCompat.checkSelfPermission(activity, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
