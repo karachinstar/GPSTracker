@@ -21,6 +21,4 @@ class TrackRecorderViewModel(application: Application) : AndroidViewModel(applic
             repository.writeLocation(longitude, latitude)
         }
     }
-
-    // Ваши другие методы
 }

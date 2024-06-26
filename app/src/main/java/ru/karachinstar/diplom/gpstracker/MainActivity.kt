@@ -14,7 +14,6 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: PermissionsViewModel by viewModels()
     private lateinit var manageStorageRequestLauncher: ActivityResultLauncher<Intent>
 
-    // ActivityResultLauncher для запроса остальных разрешений
     private val requestPermissionLauncher: ActivityResultLauncher<Array<String>> by lazy {
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -31,14 +30,12 @@ class MainActivity : AppCompatActivity() {
             if (result.resultCode == Activity.RESULT_OK) {
                 viewModel.checkAllPermissionsGranted(this)
             } else {
-                (viewModel.permissionsGranted as MutableLiveData<Boolean>).postValue(false) // Теперь работает корректно
+                (viewModel.permissionsGranted as MutableLiveData<Boolean>).postValue(false)
             }
         }
 
-        // Инициализируем ActivityResultLauncher
         requestPermissionLauncher
 
-        // Запрашиваем разрешения
         viewModel.requestPermissions(this, requestPermissionLauncher, manageStorageRequestLauncher)
 
         viewModel.permissionsGranted.observe(this) { granted ->

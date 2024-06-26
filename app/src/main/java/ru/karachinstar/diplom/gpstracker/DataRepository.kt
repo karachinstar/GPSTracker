@@ -71,9 +71,10 @@ class DataRepository(private val context: Context) {
     private val _graphic = MutableLiveData<Graphic>()
     val graphic: LiveData<Graphic> get() = _graphic
 
-    /**
-     * Methods loading file
-     */
+    *
+    * Methods loading file
+
+
     fun loadShapefile(uri: Uri, graphicsOverlay: GraphicsOverlay): LiveData<FeatureLayer> {
         val result = MutableLiveData<FeatureLayer>()
         val fullPath = getFullPath(uri)
@@ -83,18 +84,14 @@ class DataRepository(private val context: Context) {
         shapefileFeatureTable.addDoneLoadingListener {
             if (shapefileFeatureTable.loadStatus == LoadStatus.LOADED) {
                 val featureLayer = FeatureLayer(shapefileFeatureTable)
-
-                // Проверка типа геометрии слоя
                 when (featureLayer.featureTable.geometryType) {
                     GeometryType.POINT -> {
-                        // Если это точки, установите красный цвет
                         val redMarkerSymbol =
                             SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10f)
                         featureLayer.renderer = SimpleRenderer(redMarkerSymbol)
                     }
 
                     GeometryType.POLYGON -> {
-                        // Если это полигон, установите синий контур без заливки
                         val blueOutline =
                             SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.BLUE, 2f)
                         val fillSymbol = SimpleFillSymbol(
@@ -106,7 +103,6 @@ class DataRepository(private val context: Context) {
                     }
 
                     GeometryType.POLYLINE -> {
-                        // Если это линия, установите бледно-голубой цвет
                         val paleBlueLineSymbol = SimpleLineSymbol(
                             SimpleLineSymbol.Style.SOLID,
                             Color.parseColor("#ADD8E6"),
@@ -119,28 +115,42 @@ class DataRepository(private val context: Context) {
                     GeometryType.MULTIPOINT -> TODO()
                     GeometryType.UNKNOWN -> TODO()
                 }
-                // Получаем объекты из слоя
+
                 val features = shapefileFeatureTable.queryFeaturesAsync(QueryParameters()).get()
 
-                // Для каждой точки создаем текстовый графический объект
+
                 for (feature in features) {
                     if (feature.geometry is Point) {
                         val point = feature.geometry as Point
-                        val pkValue = (feature.attributes["PK"] as? Number)?.toInt()?.toString() ?: "" // Получаем значение атрибута PK
-                        val textSymbol = TextSymbol(14f, pkValue, Color.RED, TextSymbol.HorizontalAlignment.RIGHT, TextSymbol.VerticalAlignment.TOP).apply {
-                            color = Color.RED // Цвет текста
-                            haloColor = Color.WHITE // Цвет обводки
-                            haloWidth = 2f // Ширина обводки в пикселях
+                        val pkValue =
+                            (feature.attributes["PK"] as? Number)?.toInt()?.toString() ?: ""
+                        val textSymbol = TextSymbol(
+                            14f,
+                            pkValue,
+                            Color.RED,
+                            TextSymbol.HorizontalAlignment.RIGHT,
+                            TextSymbol.VerticalAlignment.TOP
+                        ).apply {
+                            color = Color.RED
+                            haloColor = Color.WHITE
+                            haloWidth = 2f
                         }
                         val graphic = Graphic(point, textSymbol)
                         graphicsOverlay.graphics.add(graphic)
                     } else if (feature.geometry is Polygon) {
                         val point = feature.geometry as Polygon
-                        val pkValue = (feature.attributes["MD"] as? Number)?.toInt()?.toString() ?: "" // Получаем значение атрибута PK
-                        val textSymbol = TextSymbol(14f, pkValue, Color.BLUE, TextSymbol.HorizontalAlignment.LEFT, TextSymbol.VerticalAlignment.BOTTOM).apply {
-                            color = Color.BLUE // Цвет текста
-                            haloColor = Color.WHITE // Цвет обводки
-                            haloWidth = 2f // Ширина обводки в пикселях
+                        val pkValue =
+                            (feature.attributes["MD"] as? Number)?.toInt()?.toString() ?: ""
+                        val textSymbol = TextSymbol(
+                            14f,
+                            pkValue,
+                            Color.BLUE,
+                            TextSymbol.HorizontalAlignment.LEFT,
+                            TextSymbol.VerticalAlignment.BOTTOM
+                        ).apply {
+                            color = Color.BLUE
+                            haloColor = Color.WHITE
+                            haloWidth = 2f
 
                         }
                         val graphic = Graphic(point, textSymbol)
@@ -176,24 +186,20 @@ class DataRepository(private val context: Context) {
         val result = MutableLiveData<KmlLayer>()
         val fullPath = getFullPath(uri)
         println(fullPath)
-        // Создание KmlDataset из Uri
+
         val kmlDataset = KmlDataset(fullPath)
 
-        // Создание KmlLayer из KmlDataset
         val kmlLayer = KmlLayer(kmlDataset)
 
-        // Обработка ошибок
         kmlLayer.addDoneLoadingListener {
             if (kmlLayer.loadStatus == LoadStatus.FAILED_TO_LOAD) {
-                // Здесь вы можете обработать ошибку, возможно, установив значение для другого LiveData объекта,
-                // который будет наблюдать ваша ViewModel или Activity.
+                TODO()
             } else {
                 _layers.value = _layers.value?.plus(kmlLayer) ?: listOf(kmlLayer)
                 result.value = kmlLayer
             }
         }
 
-        // Загрузка слоя
         kmlLayer.loadAsync()
         return result
     }
@@ -222,9 +228,7 @@ class DataRepository(private val context: Context) {
             uri.path?.startsWith("/document/home:") == true -> {
                 "/storage/emulated/0/Documents/$path"
             }
-
             else -> {
-                // Обработка других случаев
                 path ?: ""
             }
         }
@@ -272,10 +276,8 @@ class DataRepository(private val context: Context) {
             }
             uri = resolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
             outputStream = resolver.openOutputStream(uri!!)
-
             xmlSerializer = Xml.newSerializer()
             xmlSerializer?.setOutput(outputStream, "UTF-8")
-
             xmlSerializer?.startDocument("UTF-8", true)
             xmlSerializer?.text("\n")
             xmlSerializer?.startTag(null, "kml")
@@ -342,7 +344,6 @@ class DataRepository(private val context: Context) {
     }
 
     fun drawLineAndTrackDistance(currentPoint: Point, targetPoint: Point): Graphic {
-        // Отрисовать линию
         val line = PolylineBuilder(SpatialReferences.getWgs84())
         val lineSymbol = SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.MAGENTA, 4f)
         line.addPoint(currentPoint)
@@ -352,7 +353,6 @@ class DataRepository(private val context: Context) {
     }
 
     fun calculateDistance(currentPoint: Point, targetPoint: Point) {
-        // Рассчитать и отобразить расстояние
         val distance = GeometryEngine.distanceGeodetic(
             currentPoint, targetPoint, LinearUnit(
                 LinearUnitId.KILOMETERS
@@ -362,7 +362,6 @@ class DataRepository(private val context: Context) {
     }
 
     fun calculateDeviation(currentPoint: Point, polyline: Polyline) {
-        // Рассчитать и отобразить отклонение
         val nearestCoordinate = GeometryEngine.nearestCoordinate(polyline, currentPoint)
         val deviation = GeometryEngine.distanceGeodetic(
             currentPoint,

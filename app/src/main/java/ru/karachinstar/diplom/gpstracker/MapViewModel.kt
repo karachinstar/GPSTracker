@@ -15,7 +15,6 @@ import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
 class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: DataRepository = DataRepository(application)
     val layers: LiveData<List<Layer>> = repository.layers
-    //var mapScale: Double = 72000.0
     var mapCenter: Viewpoint = Viewpoint(52.2750, 104.2605, 72000.0)
 
     fun loadShapefile(uri: Uri, graphicsOverlay: GraphicsOverlay) {
@@ -34,7 +33,4 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         return repository.getFilteredAttributes(feature)
     }
 
-
-
-    // Ваши другие методы
 }

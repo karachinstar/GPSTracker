@@ -22,14 +22,12 @@ class MyApplication : Application() {
         val spatialReference = SpatialReference.create(28418)
 
         map = if (activeNetworkInfo != null && activeNetworkInfo.isConnected) {
-            // Если есть интернет, устанавливаем первую карту
             ArcGISMap(BasemapStyle.OSM_STANDARD)
         } else {
-            // Если нет интернета, устанавливаем вторую карту
             ArcGISMap(spatialReference)
         }
 
-        AppWatcher.config = AppWatcher.config.copy(watchActivities = true, watchFragments = true)
+       // AppWatcher.config = AppWatcher.config.copy(watchActivities = true, watchFragments = true)
     }
 }
 
