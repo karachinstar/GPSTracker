@@ -71,10 +71,6 @@ class DataRepository(private val context: Context) {
     private val _graphic = MutableLiveData<Graphic>()
     val graphic: LiveData<Graphic> get() = _graphic
 
-    *
-    * Methods loading file
-
-
     fun loadShapefile(uri: Uri, graphicsOverlay: GraphicsOverlay): LiveData<FeatureLayer> {
         val result = MutableLiveData<FeatureLayer>()
         val fullPath = getFullPath(uri)
