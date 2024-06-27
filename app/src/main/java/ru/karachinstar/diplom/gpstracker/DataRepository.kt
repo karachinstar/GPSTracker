@@ -11,15 +11,24 @@ import android.provider.MediaStore
 import android.util.Log
 import android.util.Xml
 
-import android.widget.Toast
+
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.esri.arcgisruntime.arcgisservices.LabelDefinition
 import com.esri.arcgisruntime.data.Feature
+import com.esri.arcgisruntime.concurrent.ListenableFuture
+import com.esri.arcgisruntime.data.FeatureCollection
+import com.esri.arcgisruntime.data.FeatureCollectionTable
+import com.esri.arcgisruntime.data.FeatureTable
+import com.esri.arcgisruntime.data.Field
+import com.esri.arcgisruntime.data.FieldDescription
+import com.esri.arcgisruntime.data.Geodatabase
+import com.esri.arcgisruntime.data.GeodatabaseFeatureTable
 import com.esri.arcgisruntime.data.QueryParameters
 import com.esri.arcgisruntime.data.ShapefileFeatureTable
+import com.esri.arcgisruntime.data.TableDescription
 import com.esri.arcgisruntime.geometry.AngularUnit
 import com.esri.arcgisruntime.geometry.AngularUnitId
+import com.esri.arcgisruntime.geometry.DatumTransformation
 import com.esri.arcgisruntime.geometry.GeodeticCurveType
 import com.esri.arcgisruntime.geometry.GeometryEngine
 import com.esri.arcgisruntime.geometry.GeometryType
@@ -27,8 +36,10 @@ import com.esri.arcgisruntime.geometry.LinearUnit
 import com.esri.arcgisruntime.geometry.LinearUnitId
 import com.esri.arcgisruntime.geometry.Point
 import com.esri.arcgisruntime.geometry.Polygon
+import com.esri.arcgisruntime.geometry.PolygonBuilder
 import com.esri.arcgisruntime.geometry.Polyline
 import com.esri.arcgisruntime.geometry.PolylineBuilder
+import com.esri.arcgisruntime.geometry.SpatialReference
 import com.esri.arcgisruntime.geometry.SpatialReferences
 import com.esri.arcgisruntime.layers.FeatureLayer
 import com.esri.arcgisruntime.layers.KmlLayer
@@ -45,7 +56,11 @@ import com.esri.arcgisruntime.symbology.SimpleLineSymbol
 import com.esri.arcgisruntime.symbology.SimpleMarkerSymbol
 import com.esri.arcgisruntime.symbology.SimpleRenderer
 import com.esri.arcgisruntime.symbology.TextSymbol
+import org.osgeo.proj4j.CRSFactory
+import org.osgeo.proj4j.CoordinateTransformFactory
+import org.osgeo.proj4j.ProjCoordinate
 import org.xmlpull.v1.XmlSerializer
+import java.io.File
 import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -70,8 +85,12 @@ class DataRepository(private val context: Context) {
 
     private val _graphic = MutableLiveData<Graphic>()
     val graphic: LiveData<Graphic> get() = _graphic
+    private var openGeodatabases: MutableMap<FeatureLayer, Geodatabase> = mutableMapOf()
 
-    fun loadShapefile(uri: Uri, graphicsOverlay: GraphicsOverlay): LiveData<FeatureLayer> {
+    fun loadShapefile(
+        uri: Uri,
+        graphicsOverlay: GraphicsOverlay
+    ): LiveData<FeatureLayer> {
         val result = MutableLiveData<FeatureLayer>()
         val fullPath = getFullPath(uri)
         println(fullPath)
@@ -79,84 +98,35 @@ class DataRepository(private val context: Context) {
         shapefileFeatureTable.loadAsync()
         shapefileFeatureTable.addDoneLoadingListener {
             if (shapefileFeatureTable.loadStatus == LoadStatus.LOADED) {
-                val featureLayer = FeatureLayer(shapefileFeatureTable)
-                when (featureLayer.featureTable.geometryType) {
-                    GeometryType.POINT -> {
-                        val redMarkerSymbol =
-                            SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10f)
-                        featureLayer.renderer = SimpleRenderer(redMarkerSymbol)
-                    }
+                val wgs84 = SpatialReference.create(4326)
 
-                    GeometryType.POLYGON -> {
-                        val blueOutline =
-                            SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.BLUE, 2f)
-                        val fillSymbol = SimpleFillSymbol(
-                            SimpleFillSymbol.Style.NULL,
-                            Color.TRANSPARENT,
-                            blueOutline
-                        )
-                        featureLayer.renderer = SimpleRenderer(fillSymbol)
-                    }
-
-                    GeometryType.POLYLINE -> {
-                        val paleBlueLineSymbol = SimpleLineSymbol(
-                            SimpleLineSymbol.Style.SOLID,
-                            Color.parseColor("#ADD8E6"),
-                            2f
-                        )
-                        featureLayer.renderer = SimpleRenderer(paleBlueLineSymbol)
-                    }
-
-                    GeometryType.ENVELOPE -> TODO()
-                    GeometryType.MULTIPOINT -> TODO()
-                    GeometryType.UNKNOWN -> TODO()
-                }
-
-                val features = shapefileFeatureTable.queryFeaturesAsync(QueryParameters()).get()
-
-
-                for (feature in features) {
-                    if (feature.geometry is Point) {
-                        val point = feature.geometry as Point
-                        val pkValue =
-                            (feature.attributes["PK"] as? Number)?.toInt()?.toString() ?: ""
-                        val textSymbol = TextSymbol(
-                            14f,
-                            pkValue,
-                            Color.RED,
-                            TextSymbol.HorizontalAlignment.RIGHT,
-                            TextSymbol.VerticalAlignment.TOP
-                        ).apply {
-                            color = Color.RED
-                            haloColor = Color.WHITE
-                            haloWidth = 2f
-                        }
-                        val graphic = Graphic(point, textSymbol)
-                        graphicsOverlay.graphics.add(graphic)
-                    } else if (feature.geometry is Polygon) {
-                        val point = feature.geometry as Polygon
-                        val pkValue =
-                            (feature.attributes["MD"] as? Number)?.toInt()?.toString() ?: ""
-                        val textSymbol = TextSymbol(
-                            14f,
-                            pkValue,
-                            Color.BLUE,
-                            TextSymbol.HorizontalAlignment.LEFT,
-                            TextSymbol.VerticalAlignment.BOTTOM
-                        ).apply {
-                            color = Color.BLUE
-                            haloColor = Color.WHITE
-                            haloWidth = 2f
-
-                        }
-                        val graphic = Graphic(point, textSymbol)
-                        graphicsOverlay.graphics.add(graphic)
-
+                if (shapefileFeatureTable.spatialReference.wkid == 4326) {
+                    // Shape-файл уже в WGS84, используем его напрямую
+                    val featureLayer = FeatureLayer(shapefileFeatureTable)
+                    applyRendererAndLabels(
+                        featureLayer,
+                        graphicsOverlay
+                    ) // Применяем рендерер и метки
+                    _layers.value = _layers.value?.plus(featureLayer) ?: listOf(featureLayer)
+                    result.value = featureLayer
+                } else {
+                    // Shape-файл в другой пространственной привязке, перепроецируем и сохраняем в базу геоданных
+                    reprojectAndSaveToGeodatabase(
+                        fullPath,
+                        shapefileFeatureTable,
+                        wgs84,
+                        graphicsOverlay
+                    ) { geodatabaseFeatureTable ->
+                        // Создаем слой на основе таблицы из базы геоданных
+                        val featureLayer = FeatureLayer(geodatabaseFeatureTable)
+                        applyRendererAndLabels(
+                            featureLayer,
+                            graphicsOverlay
+                        )// Применяем рендерер и метки
+                        _layers.value = _layers.value?.plus(featureLayer) ?: listOf(featureLayer)
+                        result.value = featureLayer
                     }
                 }
-
-                _layers.value = _layers.value?.plus(featureLayer) ?: listOf(featureLayer)
-                result.value = featureLayer
             } else {
                 Log.e(
                     "MainActivity",
@@ -165,6 +135,246 @@ class DataRepository(private val context: Context) {
             }
         }
         return result
+    }
+
+    // Функция для перепроецирования и сохранения в базу геоданных
+    private fun reprojectAndSaveToGeodatabase(
+        fullPath: String,
+        shapefileFeatureTable: ShapefileFeatureTable,
+        wgs84: SpatialReference,
+        graphicsOverlay: GraphicsOverlay,
+        callback: (GeodatabaseFeatureTable) -> Unit
+    ) {
+        val geodatabaseFile = File(
+            fullPath.substringBeforeLast("/"),
+            fullPath.substringAfterLast("/").substringBeforeLast(".") + ".geodatabase"
+        )
+        if (geodatabaseFile.exists()) {
+            geodatabaseFile.delete()
+        }
+        val geodatabaseFuture = Geodatabase.createAsync(geodatabaseFile.path)
+        geodatabaseFuture.addDoneListener {
+            try {
+                val geodatabase = geodatabaseFuture.get()
+                val tableDescription = TableDescription(
+                    "my_feature_table",
+                    SpatialReferences.getWgs84(),
+                    shapefileFeatureTable.geometryType
+                ) // Исправлено
+                Log.d("DataRepository", "Table geometry type: ${tableDescription.geometryType}")
+                val shapefileFields = shapefileFeatureTable.fields
+                val fields = shapefileFields.map { shapefileField ->
+                        FieldDescription(shapefileField.name, shapefileField.fieldType)
+                    }
+                tableDescription.fieldDescriptions.addAll(fields)
+                tableDescription.apply {
+                    setHasAttachments(false)
+                    setHasM(false)
+                    setHasZ(false)
+                }
+                val featureTableFuture = geodatabase.createTableAsync(tableDescription)
+                featureTableFuture.addDoneListener {
+                    val geodatabaseFeatureTable = featureTableFuture.get() as GeodatabaseFeatureTable
+                    val features = shapefileFeatureTable.queryFeaturesAsync(QueryParameters()).get()
+                    val sourceCRS = CRSFactory().createFromName("EPSG:28418") // Pulkovo 1942 / Gauss-Kruger zone 8
+                    val targetCRS = CRSFactory().createFromName("EPSG:4326") // WGS84
+                    val transform = CoordinateTransformFactory().createTransform(sourceCRS, targetCRS)
+                    for (feature in features) {
+                        val originalGeometry = feature.geometry
+                        Log.d("DataRepository", "Original geometry: $originalGeometry")
+                        val projectedGeometry = when (originalGeometry.geometryType) {
+                            GeometryType.POINT -> {
+                                val point = originalGeometry as Point
+                                val sourceCoords = ProjCoordinate(point.x, point.y)
+                                val targetCoords = ProjCoordinate()
+                                transform.transform(sourceCoords, targetCoords)
+                                Point(targetCoords.x, targetCoords.y, wgs84)
+                            }
+                            GeometryType.POLYLINE -> {
+                                val polyline = originalGeometry as Polyline
+                                val projectedPolylineBuilder = PolylineBuilder(wgs84)
+                                for (point in polyline.parts[0].points) {
+                                    val sourceCoords = ProjCoordinate(point.x, point.y)
+                                    val targetCoords = ProjCoordinate()
+                                    transform.transform(sourceCoords, targetCoords)
+                                    projectedPolylineBuilder.addPoint(targetCoords.x, targetCoords.y)
+                                }
+                                projectedPolylineBuilder.toGeometry()
+                            }
+                            GeometryType.POLYGON -> {
+                                val polygon = originalGeometry as Polygon
+                                val projectedPolygonBuilder = PolygonBuilder(wgs84)
+                                for (part in polygon.parts) {
+                                    for (point in part.points) {
+                                        val sourceCoords = ProjCoordinate(point.x, point.y)
+                                        val targetCoords = ProjCoordinate()
+                                        transform.transform(sourceCoords, targetCoords)
+                                        projectedPolygonBuilder.addPoint(targetCoords.x, targetCoords.y)
+                                    }
+                                }
+                                projectedPolygonBuilder.toGeometry()
+                            }
+                            else -> {
+                                // Обработка других типов геометрии, если необходимо
+                                null
+                            }
+                        }
+//                        val originalGeometry = feature.geometry
+//                        Log.d("DataRepository", "Original geometry: $originalGeometry")
+//                        val projectedGeometry = GeometryEngine.project(originalGeometry, wgs84)
+//                        Log.d("DataRepository", "Projected geometry: $projectedGeometry")
+//                        Log.d("DataRepository", "Feature attributes: ${feature.attributes}")
+
+                        // Создаем новый объект Feature и добавляем его в таблицу базы геоданных
+                        if (projectedGeometry != null) {
+                            Log.d("DataRepository", "Projected geometry: $projectedGeometry")
+                            val attributes = feature.attributes
+                            val newFeature = geodatabaseFeatureTable.createFeature(attributes, projectedGeometry)
+                            geodatabaseFeatureTable.addFeatureAsync(newFeature)
+                        }
+                    }
+                    callback(geodatabaseFeatureTable) // Вызываем callback с таблицей из базы геоданных
+
+                    val geodatabaseUri = Uri.fromFile(geodatabaseFile)
+                    loadGeodatabase(geodatabaseUri, graphicsOverlay)
+                    //geodatabase.close() // Закрываем базу геоданных, чтобы сохранить изменения
+                }
+            }catch (e: Exception) {
+                // Обрабатываем ошибки при создании базы геоданных
+                Log.e("DataRepository", "Error creating geodatabase", e) // Выводим ошибку в лог
+                // ... (добавьте другую обработку ошибок)
+            }
+        }
+    }
+
+
+    private fun applyRendererAndLabels(
+        featureLayer: FeatureLayer,
+        graphicsOverlay: GraphicsOverlay
+    ) {
+        when (featureLayer.featureTable.geometryType) {
+            GeometryType.POINT -> {
+                val redMarkerSymbol =
+                    SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10f)
+                featureLayer.renderer = SimpleRenderer(redMarkerSymbol)
+            }
+
+            GeometryType.POLYGON -> {
+                val blueOutline =
+                    SimpleLineSymbol(SimpleLineSymbol.Style.SOLID, Color.BLUE, 2f)
+                val fillSymbol = SimpleFillSymbol(
+                    SimpleFillSymbol.Style.NULL,
+                    Color.TRANSPARENT,
+                    blueOutline
+                )
+                featureLayer.renderer = SimpleRenderer(fillSymbol)
+            }
+
+            GeometryType.POLYLINE -> {
+                val paleBlueLineSymbol = SimpleLineSymbol(
+                    SimpleLineSymbol.Style.SOLID,
+                    Color.parseColor("#ADD8E6"),
+                    2f
+                )
+                featureLayer.renderer = SimpleRenderer(paleBlueLineSymbol)
+            }
+
+            GeometryType.ENVELOPE -> TODO()
+            GeometryType.MULTIPOINT -> TODO()
+            GeometryType.UNKNOWN -> TODO()
+        }
+
+        val features = featureLayer.featureTable.queryFeaturesAsync(QueryParameters()).get()
+
+
+        for (feature in features) {
+            if (feature.geometry is Point) {
+                val point = feature.geometry as Point
+                val pkValue =
+                    (feature.attributes["PK"] as? Number)?.toInt()?.toString() ?: ""
+                val textSymbol = TextSymbol(
+                    14f,
+                    pkValue,
+                    Color.RED,
+                    TextSymbol.HorizontalAlignment.RIGHT,
+                    TextSymbol.VerticalAlignment.TOP
+                ).apply {
+                    color = Color.RED
+                    haloColor = Color.WHITE
+                    haloWidth = 2f
+                }
+                val graphic = Graphic(point, textSymbol)
+                graphicsOverlay.graphics.add(graphic)
+            } else if (feature.geometry is Polygon) {
+                val point = feature.geometry as Polygon
+                val pkValue =
+                    (feature.attributes["MD"] as? Number)?.toInt()?.toString() ?: ""
+                val textSymbol = TextSymbol(
+                    14f,
+                    pkValue,
+                    Color.BLUE,
+                    TextSymbol.HorizontalAlignment.LEFT,
+                    TextSymbol.VerticalAlignment.BOTTOM
+                ).apply {
+                    color = Color.BLUE
+                    haloColor = Color.WHITE
+                    haloWidth = 2f
+
+                }
+                val graphic = Graphic(point, textSymbol)
+                graphicsOverlay.graphics.add(graphic)
+
+            }
+        }
+
+    }
+
+    fun loadGeodatabase(
+        uri: Uri,
+        graphicsOverlay: GraphicsOverlay
+    ): LiveData<FeatureLayer> {
+        val result = MutableLiveData<FeatureLayer>()
+        val fullPath = getFullPath(uri)
+        val geodatabaseFile = File(fullPath)
+        println(fullPath)
+        println(geodatabaseFile.path)
+
+        try {
+            // Загружаем существующую базу геоданных
+            val geodatabase = Geodatabase(geodatabaseFile.path)
+
+            // Получаем список таблиц
+            val featureTables = geodatabase.geodatabaseFeatureTables
+
+            if (featureTables.isNotEmpty()) {
+                // Выбираем первую таблицу из списка (если есть)
+                val geodatabaseFeatureTable = featureTables.firstOrNull()
+
+                if (geodatabaseFeatureTable != null) {
+                    // Создаем слой на основе таблицы из базы геоданных
+                    val featureLayer = FeatureLayer(geodatabaseFeatureTable)
+                    applyRendererAndLabels(featureLayer, graphicsOverlay)
+                    _layers.value = _layers.value?.plus(featureLayer) ?: listOf(featureLayer)
+                    result.value = featureLayer
+                    openGeodatabases[featureLayer] = geodatabase
+                    removeLayerAndCloseGeodatabase(featureLayer)
+                }else {
+                    Log.e("DataRepository", "No feature tables found in geodatabase.")
+                }
+            } else {
+                Log.e("DataRepository", "Geodatabase is empty.")
+            }
+
+        } catch (e: Exception) {
+            Log.e("DataRepository", "Error loading geodatabase", e)
+        }
+
+        return result
+    }
+    fun removeLayerAndCloseGeodatabase(featureLayer: FeatureLayer) {
+        _layers.value = _layers.value?.minus(featureLayer)
+        openGeodatabases[featureLayer]?.close() // Закрываем базу геоданных
+        openGeodatabases.remove(featureLayer) // Удаляем ссылку на базу геоданных
     }
 
     fun loadGeoTiff(uri: Uri): LiveData<RasterLayer> {
@@ -224,6 +434,7 @@ class DataRepository(private val context: Context) {
             uri.path?.startsWith("/document/home:") == true -> {
                 "/storage/emulated/0/Documents/$path"
             }
+
             else -> {
                 path ?: ""
             }

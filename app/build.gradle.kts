@@ -50,7 +50,8 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     //ArcGis
     implementation("com.esri.arcgisruntime:arcgis-android:100.15.5")
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+    implementation("org.osgeo:proj4j:0.1.0")
+   // implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
 
 
     // https://mvnrepository.com/artifact/org.codehaus.woodstox/stax2-api

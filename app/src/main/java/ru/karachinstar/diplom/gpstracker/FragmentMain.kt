@@ -25,6 +25,7 @@ import com.esri.arcgisruntime.geometry.Point
 import com.esri.arcgisruntime.geometry.Polygon
 import com.esri.arcgisruntime.geometry.Polyline
 import com.esri.arcgisruntime.geometry.SpatialReferences
+import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.mapping.Viewpoint
 import com.esri.arcgisruntime.mapping.view.DefaultMapViewOnTouchListener
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
@@ -50,6 +51,7 @@ class FragmentMain : Fragment() {
     private lateinit var geodeticPathViewModel: GeodeticPathViewModel
     private lateinit var lineGraphicsOverlay: GraphicsOverlay
     private lateinit var labelGraphicsOverlay: GraphicsOverlay
+    private val loadedLayers = mutableListOf<Layer>()
 
     private lateinit var app: MyApplication
     private lateinit var locationDisplay: LocationDisplay
@@ -158,6 +160,11 @@ class FragmentMain : Fragment() {
 
         binding.buttonRecordTrack.setOnClickListener {
             trackRecorderViewModel.startStopRecording()
+            if (trackRecorderViewModel.isRecording.value == true) {
+                binding.buttonRecordTrack.setBackgroundResource(R.drawable.rec_start_button)
+            }else{
+                binding.buttonRecordTrack.setBackgroundResource(R.drawable.rec_stop_button)
+            }
         }
         binding.loadFileButton.setOnClickListener {
             openFile()
@@ -166,9 +173,10 @@ class FragmentMain : Fragment() {
             locationDisplay.autoPanMode = LocationDisplay.AutoPanMode.COMPASS_NAVIGATION
         }
         mapViewModel.layers.observe(viewLifecycleOwner) { layers ->
-            mapView.map.operationalLayers.clear()
+            //mapView.map.operationalLayers.clear()
             val sortedLayers = repository.sortLayers(layers)
             mapView.map.operationalLayers.addAll(sortedLayers)
+            loadedLayers.addAll(sortedLayers)
         }
 
     }
@@ -208,8 +216,35 @@ class FragmentMain : Fragment() {
         builder.setTitle("Feature Information")
 
         val filteredAttributes = mapViewModel.getFilteredAttributesForFeature(identifiedFeature)
+        val geometry = identifiedFeature.geometry
+        val originalPoint = geometry as? Point // Получаем точку до перепроецирования
+//        val originalLongitude = originalPoint?.x ?: 0.0
+//        val originalLatitude = originalPoint?.y ?: 0.0
 
-        val message = filteredAttributes.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+//        val projectedGeometry = GeometryEngine.project(geometry, SpatialReferences.getWgs84())
+//        val longitude = (projectedGeometry as? Point)?.x ?: 0.0
+//        val latitude = (projectedGeometry as? Point)?.y ?: 0.0
+//
+//        val message = filteredAttributes.entries.joinToString("\n") { "${it.key}: ${it.value}" } +
+//                "\nПроекция: ${geometry.spatialReference.wkid}\n" +
+//                "Координаты (СК 28418):\n" +
+//                "Широта: $originalLatitude\n" +
+//                "Долгота: $originalLongitude\n" +
+//                "Координаты (WGS84):\n" +
+//                "Широта: $latitude\n" +
+//                "Долгота: $longitude"
+//        builder.setMessage(message)
+
+//        val geometry = identifiedFeature.geometry
+        val projectedGeometry = GeometryEngine.project(geometry, SpatialReferences.getWgs84())
+        val longitude = (projectedGeometry as? Point)?.x ?: 0.0
+        val latitude = (projectedGeometry as? Point)?.y ?: 0.0
+
+        val message = filteredAttributes.entries.joinToString("\n") { "${it.key}: ${it.value}" } +
+                "\nПроекция: ${geometry.spatialReference.wkid}\n" +
+                "Координаты (WGS84):\n" +
+                "Широта: $latitude\n" +
+                "Долгота: $longitude"
         builder.setMessage(message)
 
         builder.setPositiveButton("OK") { dialog, _ ->
@@ -293,19 +328,21 @@ class FragmentMain : Fragment() {
         val path = uri.path
         val format = path?.substringAfterLast(".")
         when (format) {
-            "tif" -> mapViewModel.loadGeoTiff(uri)
-            "shp" -> {
-                mapViewModel.loadShapefile(uri, labelGraphicsOverlay)
+            "tif", "shp", "kml" -> {
+                mapView.map.operationalLayers.clear() // Очищаем слои перед загрузкой нового файла
+                loadedLayers.clear() // Очищаем список загруженных слоев
             }
-
-            "kml" -> {
-                mapViewModel.loadKMLfile(uri)
-            }
-
             else -> {
                 Toast.makeText(requireContext(), "Unsupported file format", Toast.LENGTH_SHORT)
                     .show()
+                return // Прерываем выполнение, если формат файла не поддерживается
             }
+        }
+
+        when (format) {
+            "tif" -> mapViewModel.loadGeoTiff(uri)
+            "shp" -> mapViewModel.loadShapefile(uri, labelGraphicsOverlay)
+            "kml" -> mapViewModel.loadKMLfile(uri)
         }
     }
 
@@ -316,8 +353,8 @@ class FragmentMain : Fragment() {
 
     override fun onPause() {
         mapViewModel.mapCenter = mapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE)
-        mapView.map.operationalLayers.clear()
-        lineGraphicsOverlay.graphics.clear()
+        //mapView.map.operationalLayers.clear()
+        //lineGraphicsOverlay.graphics.clear()
 
         mapView.pause()
         super.onPause()
@@ -326,6 +363,12 @@ class FragmentMain : Fragment() {
     override fun onResume() {
         super.onResume()
         mapView.resume()
+        mapView.setViewpoint(mapViewModel.mapCenter)
+//        for (layer in loadedLayers) {
+//            if (!mapView.map.operationalLayers.contains(layer)) { // Проверяем наличие слоя
+//                mapView.map.operationalLayers.add(layer)
+//            }
+//        }
     }
     override fun onDestroyView() {
         super.onDestroyView()
