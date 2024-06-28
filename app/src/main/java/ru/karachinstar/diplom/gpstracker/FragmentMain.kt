@@ -217,7 +217,10 @@ class FragmentMain : Fragment() {
 
         val filteredAttributes = mapViewModel.getFilteredAttributesForFeature(identifiedFeature)
         val geometry = identifiedFeature.geometry
-        val originalPoint = geometry as? Point // Получаем точку до перепроецирования
+        /*
+        Фрагмент необходим для дальнейшего добавления geodatabase
+         */
+//        val originalPoint = geometry as? Point // Получаем точку до перепроецирования
 //        val originalLongitude = originalPoint?.x ?: 0.0
 //        val originalLatitude = originalPoint?.y ?: 0.0
 
@@ -353,9 +356,6 @@ class FragmentMain : Fragment() {
 
     override fun onPause() {
         mapViewModel.mapCenter = mapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE)
-        //mapView.map.operationalLayers.clear()
-        //lineGraphicsOverlay.graphics.clear()
-
         mapView.pause()
         super.onPause()
     }
@@ -364,11 +364,6 @@ class FragmentMain : Fragment() {
         super.onResume()
         mapView.resume()
         mapView.setViewpoint(mapViewModel.mapCenter)
-//        for (layer in loadedLayers) {
-//            if (!mapView.map.operationalLayers.contains(layer)) { // Проверяем наличие слоя
-//                mapView.map.operationalLayers.add(layer)
-//            }
-//        }
     }
     override fun onDestroyView() {
         super.onDestroyView()

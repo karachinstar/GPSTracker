@@ -473,14 +473,14 @@ class DataRepository(private val context: Context) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/vnd.google-earth.kml+xml")
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+//                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                     val documentsDir =
                         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).path
                     put(MediaStore.MediaColumns.DATA, "$documentsDir/GPSTracker/Track/$fileName")
-                } else {
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/GPSTracker/Track")
-                }
-            }
+//                } else {
+//                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/GPSTracker/Track")
+//                }
+           }
             uri = resolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
             outputStream = resolver.openOutputStream(uri!!)
             xmlSerializer = Xml.newSerializer()

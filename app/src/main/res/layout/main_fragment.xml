@@ -73,11 +73,4 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         />
-
-<!--    <Spinner-->
-<!--        android:id="@+id/spinnerLayersList"-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        app:layout_constraintTop_toTopOf="@+id/mapView" />-->
-
 </androidx.constraintlayout.widget.ConstraintLayout>

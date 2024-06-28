@@ -61,6 +61,6 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.7")
+//    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.7")
 
 }

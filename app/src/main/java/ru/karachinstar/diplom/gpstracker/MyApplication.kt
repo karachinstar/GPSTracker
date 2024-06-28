@@ -6,8 +6,7 @@ import android.net.ConnectivityManager
 import com.esri.arcgisruntime.geometry.SpatialReference
 import com.esri.arcgisruntime.mapping.ArcGISMap
 import com.esri.arcgisruntime.mapping.BasemapStyle
-import leakcanary.AppWatcher
-import leakcanary.LeakCanary
+
 
 
 class MyApplication : Application() {
@@ -27,7 +26,6 @@ class MyApplication : Application() {
             ArcGISMap(spatialReference)
         }
 
-       // AppWatcher.config = AppWatcher.config.copy(watchActivities = true, watchFragments = true)
     }
 }
 
