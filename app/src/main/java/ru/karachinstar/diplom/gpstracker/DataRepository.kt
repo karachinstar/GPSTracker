@@ -5,21 +5,13 @@ import android.content.Context
 import android.graphics.Color
 
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Xml
-
-
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.esri.arcgisruntime.data.Feature
-import com.esri.arcgisruntime.concurrent.ListenableFuture
-import com.esri.arcgisruntime.data.FeatureCollection
-import com.esri.arcgisruntime.data.FeatureCollectionTable
-import com.esri.arcgisruntime.data.FeatureTable
-import com.esri.arcgisruntime.data.Field
 import com.esri.arcgisruntime.data.FieldDescription
 import com.esri.arcgisruntime.data.Geodatabase
 import com.esri.arcgisruntime.data.GeodatabaseFeatureTable
@@ -28,7 +20,6 @@ import com.esri.arcgisruntime.data.ShapefileFeatureTable
 import com.esri.arcgisruntime.data.TableDescription
 import com.esri.arcgisruntime.geometry.AngularUnit
 import com.esri.arcgisruntime.geometry.AngularUnitId
-import com.esri.arcgisruntime.geometry.DatumTransformation
 import com.esri.arcgisruntime.geometry.GeodeticCurveType
 import com.esri.arcgisruntime.geometry.GeometryEngine
 import com.esri.arcgisruntime.geometry.GeometryType
@@ -46,7 +37,6 @@ import com.esri.arcgisruntime.layers.KmlLayer
 import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.layers.RasterLayer
 import com.esri.arcgisruntime.loadable.LoadStatus
-import com.esri.arcgisruntime.mapping.labeling.LabelExpression
 import com.esri.arcgisruntime.mapping.view.Graphic
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
 import com.esri.arcgisruntime.ogc.kml.KmlDataset
@@ -164,8 +154,8 @@ class DataRepository(private val context: Context) {
                 Log.d("DataRepository", "Table geometry type: ${tableDescription.geometryType}")
                 val shapefileFields = shapefileFeatureTable.fields
                 val fields = shapefileFields.map { shapefileField ->
-                        FieldDescription(shapefileField.name, shapefileField.fieldType)
-                    }
+                    FieldDescription(shapefileField.name, shapefileField.fieldType)
+                }
                 tableDescription.fieldDescriptions.addAll(fields)
                 tableDescription.apply {
                     setHasAttachments(false)
@@ -174,11 +164,14 @@ class DataRepository(private val context: Context) {
                 }
                 val featureTableFuture = geodatabase.createTableAsync(tableDescription)
                 featureTableFuture.addDoneListener {
-                    val geodatabaseFeatureTable = featureTableFuture.get() as GeodatabaseFeatureTable
+                    val geodatabaseFeatureTable =
+                        featureTableFuture.get() as GeodatabaseFeatureTable
                     val features = shapefileFeatureTable.queryFeaturesAsync(QueryParameters()).get()
-                    val sourceCRS = CRSFactory().createFromName("EPSG:28418") // Pulkovo 1942 / Gauss-Kruger zone 8
+                    val sourceCRS =
+                        CRSFactory().createFromName("EPSG:28418") // Pulkovo 1942 / Gauss-Kruger zone 8
                     val targetCRS = CRSFactory().createFromName("EPSG:4326") // WGS84
-                    val transform = CoordinateTransformFactory().createTransform(sourceCRS, targetCRS)
+                    val transform =
+                        CoordinateTransformFactory().createTransform(sourceCRS, targetCRS)
                     for (feature in features) {
                         val originalGeometry = feature.geometry
                         Log.d("DataRepository", "Original geometry: $originalGeometry")
@@ -190,6 +183,7 @@ class DataRepository(private val context: Context) {
                                 transform.transform(sourceCoords, targetCoords)
                                 Point(targetCoords.x, targetCoords.y, wgs84)
                             }
+
                             GeometryType.POLYLINE -> {
                                 val polyline = originalGeometry as Polyline
                                 val projectedPolylineBuilder = PolylineBuilder(wgs84)
@@ -197,10 +191,14 @@ class DataRepository(private val context: Context) {
                                     val sourceCoords = ProjCoordinate(point.x, point.y)
                                     val targetCoords = ProjCoordinate()
                                     transform.transform(sourceCoords, targetCoords)
-                                    projectedPolylineBuilder.addPoint(targetCoords.x, targetCoords.y)
+                                    projectedPolylineBuilder.addPoint(
+                                        targetCoords.x,
+                                        targetCoords.y
+                                    )
                                 }
                                 projectedPolylineBuilder.toGeometry()
                             }
+
                             GeometryType.POLYGON -> {
                                 val polygon = originalGeometry as Polygon
                                 val projectedPolygonBuilder = PolygonBuilder(wgs84)
@@ -209,13 +207,16 @@ class DataRepository(private val context: Context) {
                                         val sourceCoords = ProjCoordinate(point.x, point.y)
                                         val targetCoords = ProjCoordinate()
                                         transform.transform(sourceCoords, targetCoords)
-                                        projectedPolygonBuilder.addPoint(targetCoords.x, targetCoords.y)
+                                        projectedPolygonBuilder.addPoint(
+                                            targetCoords.x,
+                                            targetCoords.y
+                                        )
                                     }
                                 }
                                 projectedPolygonBuilder.toGeometry()
                             }
+
                             else -> {
-                                // Обработка других типов геометрии, если необходимо
                                 null
                             }
                         }
@@ -229,7 +230,8 @@ class DataRepository(private val context: Context) {
                         if (projectedGeometry != null) {
                             Log.d("DataRepository", "Projected geometry: $projectedGeometry")
                             val attributes = feature.attributes
-                            val newFeature = geodatabaseFeatureTable.createFeature(attributes, projectedGeometry)
+                            val newFeature =
+                                geodatabaseFeatureTable.createFeature(attributes, projectedGeometry)
                             geodatabaseFeatureTable.addFeatureAsync(newFeature)
                         }
                     }
@@ -239,7 +241,7 @@ class DataRepository(private val context: Context) {
                     loadGeodatabase(geodatabaseUri, graphicsOverlay)
                     //geodatabase.close() // Закрываем базу геоданных, чтобы сохранить изменения
                 }
-            }catch (e: Exception) {
+            } catch (e: Exception) {
                 // Обрабатываем ошибки при создании базы геоданных
                 Log.e("DataRepository", "Error creating geodatabase", e) // Выводим ошибку в лог
                 // ... (добавьте другую обработку ошибок)
@@ -358,7 +360,7 @@ class DataRepository(private val context: Context) {
                     result.value = featureLayer
                     openGeodatabases[featureLayer] = geodatabase
                     removeLayerAndCloseGeodatabase(featureLayer)
-                }else {
+                } else {
                     Log.e("DataRepository", "No feature tables found in geodatabase.")
                 }
             } else {
@@ -371,6 +373,7 @@ class DataRepository(private val context: Context) {
 
         return result
     }
+
     fun removeLayerAndCloseGeodatabase(featureLayer: FeatureLayer) {
         _layers.value = _layers.value?.minus(featureLayer)
         openGeodatabases[featureLayer]?.close() // Закрываем базу геоданных
@@ -473,14 +476,10 @@ class DataRepository(private val context: Context) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/vnd.google-earth.kml+xml")
-//                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                    val documentsDir =
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).path
-                    put(MediaStore.MediaColumns.DATA, "$documentsDir/GPSTracker/Track/$fileName")
-//                } else {
-//                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/GPSTracker/Track")
-//                }
-           }
+                val documentsDir =
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).path
+                put(MediaStore.MediaColumns.DATA, "$documentsDir/GPSTracker/Track/$fileName")
+            }
             uri = resolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
             outputStream = resolver.openOutputStream(uri!!)
             xmlSerializer = Xml.newSerializer()

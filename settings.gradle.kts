@@ -8,6 +8,7 @@ pluginManagement {
             }
         }
         mavenCentral()
+        jcenter()
         gradlePluginPortal()
     }
 }
@@ -16,6 +17,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        jcenter()
         maven {
             url = uri("https://esri.jfrog.io/artifactory/arcgis")
         }

@@ -65,6 +65,9 @@ class PermissionsViewModel : ViewModel() {
             Log.d("PermissionsViewModel", "Requesting permissions: ${permissionsToRequest.joinToString()}")
             requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
+        else {
+            checkAllPermissionsGranted(activity)
+        }
     }
 
     fun handlePermissionsResult(permissions: Map<String, Boolean>) {

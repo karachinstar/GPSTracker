@@ -4,9 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.ViewModel
 import com.esri.arcgisruntime.data.Feature
-import com.esri.arcgisruntime.geometry.Point
 import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.mapping.Viewpoint
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay

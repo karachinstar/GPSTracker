@@ -3,7 +3,6 @@ package ru.karachinstar.diplom.gpstracker
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.ViewModel
 import com.esri.arcgisruntime.data.Feature
 import com.esri.arcgisruntime.geometry.Point
 import com.esri.arcgisruntime.geometry.Polyline
