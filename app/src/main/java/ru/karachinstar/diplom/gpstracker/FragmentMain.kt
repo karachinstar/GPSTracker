@@ -311,7 +311,8 @@ class FragmentMain : Fragment() {
     private fun openFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "*/*"
+            type = "*/*" // Это оставим для совместимости
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/tiff", "application/octet-stream", "application/vnd.google-earth.kml+xml"))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivityForResult(intent, OPEN_FILE_REQUEST_CODE)
