@@ -164,6 +164,8 @@ class FragmentMain : Fragment() {
                 binding.buttonRecordTrack.setBackgroundResource(R.drawable.rec_start_button)
             }else{
                 binding.buttonRecordTrack.setBackgroundResource(R.drawable.rec_stop_button)
+                Toast.makeText(requireContext(), "Файл сохранен в Documents/GPSTracker/Track", Toast.LENGTH_SHORT)
+                    .show()
             }
         }
         binding.loadFileButton.setOnClickListener {
