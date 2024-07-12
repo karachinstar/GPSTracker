@@ -6,6 +6,7 @@ import android.app.AlertDialog
 import android.content.Intent
 
 import android.graphics.Color
+import android.location.LocationManager
 import android.net.Uri
 
 import android.os.Bundle
@@ -26,12 +27,13 @@ import com.esri.arcgisruntime.geometry.Polygon
 import com.esri.arcgisruntime.geometry.Polyline
 import com.esri.arcgisruntime.geometry.SpatialReferences
 import com.esri.arcgisruntime.layers.Layer
+import com.esri.arcgisruntime.location.AndroidLocationDataSource
 import com.esri.arcgisruntime.mapping.Viewpoint
 import com.esri.arcgisruntime.mapping.view.DefaultMapViewOnTouchListener
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay
 import com.esri.arcgisruntime.mapping.view.LocationDisplay
 import com.esri.arcgisruntime.mapping.view.MapView
-
+import com.esri.arcgisruntime.location.LocationDataSource
 import ru.karachinstar.diplom.gpstracker.databinding.MainFragmentBinding
 import java.io.File
 
@@ -122,7 +124,23 @@ class FragmentMain : Fragment() {
 
         locationDisplay = mapView.locationDisplay
         setupTouchListener()
+
+//Создаем AndroidLocationDataSource
+        val locationDataSource = AndroidLocationDataSource(requireContext())
+
+// Присваиваем LocationDataSource к LocationDisplay
+        locationDisplay.locationDataSource = locationDataSource
+
+// Запускаем LocationDisplay
         locationDisplay.startAsync()
+
+// Запрашиваем обновления местоположения
+        val minTimeMs = 500L // Интервал в миллисекундах
+        val minDistanceMeters = 1.0f // Минимальное расстояние в метрах
+        locationDataSource.requestLocationUpdates(
+            LocationManager.GPS_PROVIDER, minTimeMs,
+            minDistanceMeters
+        )// Или LocationManager.NETWORK_PROVIDER
 
         geodeticPathViewModel.distance.observe(viewLifecycleOwner) { distance ->
             binding.distanceTextView.setBackgroundColor(Color.WHITE)
@@ -314,7 +332,7 @@ class FragmentMain : Fragment() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*" // Это оставим для совместимости
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/tiff", "application/octet-stream", "application/vnd.google-earth.kml+xml"))
+            //putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/tiff", "x-gis/x-shapefile", "application/vnd.google-earth.kml+xml"))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivityForResult(intent, OPEN_FILE_REQUEST_CODE)

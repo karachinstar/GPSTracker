@@ -21,7 +21,7 @@ class MyApplication : Application() {
         val spatialReference = SpatialReference.create(28418)
 
         map = if (activeNetworkInfo != null && activeNetworkInfo.isConnected) {
-            ArcGISMap(BasemapStyle.OSM_STANDARD)
+            ArcGISMap(BasemapStyle.ARCGIS_IMAGERY_STANDARD)
         } else {
             ArcGISMap(spatialReference)
         }
