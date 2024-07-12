@@ -18,7 +18,7 @@ class MyApplication : Application() {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val activeNetworkInfo = connectivityManager.activeNetworkInfo
 
-        val spatialReference = SpatialReference.create(28418)
+        val spatialReference = SpatialReference.create(3857)
 
         map = if (activeNetworkInfo != null && activeNetworkInfo.isConnected) {
             ArcGISMap(BasemapStyle.ARCGIS_IMAGERY_STANDARD)
